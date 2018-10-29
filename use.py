@@ -6,68 +6,70 @@ import os
 import sys
 import tempfile
 
+LEGAL_COMMANDS = [
+    "complete",
+    "config",
+    "processStdIn",
+    "setup",
+    "unuse",
+    "use",
+    "used",
+    "which",
+]
+LEGAL_PERMISSIONS = [644, 744, 754, 755, 654, 655, 645]
+ENFORCE_PERMISSIONS = False
+DISPLAY_PERMISSIONS_VIOLATIONS = False
+DEFAULT_USE_PKG_PATHS = ["/opt/use", "/home/bvz/Documents/dev/use/"]
 
-#LEGAL_COMMANDS = ["setup",
-#                  "complete",
-#                  "use",
-#                  "used",
-#                   "unuse",
-#                   "which",
-#                   "config",
-#                   "writehistory",
-#                   "processStdIn"]
-legalPermissionsL = [644, 744, 754, 755, 654, 655, 645]
-enforcePermissions = False
-displayPermissionViolations = False
-defaultUsePkgPathsL = ["/opt/use", "/home/bvz/Documents/dev/use/"]
 
-
-# --------------------------------------------------------------------------------------------------
-def exportStdIn():
+# ------------------------------------------------------------------------------
+def export_stdin():
     """
     Takes the StdIn exports it to StdOut as a python list.
 
     :return: Nothing.
     """
 
-    exportShellCommand(str(sys.stdin))
+    export_shell_command(str(sys.stdin))
 
 
-# --------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 def display_usage():
     """
-    Prints the usage string. Note: because most of the output of this script is intended to be
-    processed by a calling shell script using 'eval', the usage string will be printed to stdErr
-    to prevent it from being processed as a command.
+    Prints the usage string. Note: because most of the output of this script is
+    intended to be processed by a calling shell script using 'eval', the usage
+    string will be printed to stdErr to prevent it from being processed as a
+    command.
 
     :return: Nothing.
     """
 
-    displayError("Usage")
+    display_error("Usage")
 
 
-# --------------------------------------------------------------------------------------------------
-def displayError(*msgsL):
+# ------------------------------------------------------------------------------
+def display_error(*msgs):
     """
     Displays a message to the stdErr
 
-    :param msgsL: An arbitrary list of items to display. Each item will be converted to a string
-           before being displayed. All items will be displayed on a single line.
+    :param msgs: An arbitrary list of items to display. Each item will be
+    converted to a string before being displayed. All items will be displayed on
+    a single line.
 
     :return: Nothing.
     """
 
     message = ""
-    for item in msgsL:
+    for item in msgs:
         message += str(item) + " "
     print(message.strip(" "), file=sys.stderr)
 
 
-# --------------------------------------------------------------------------------------------------
-def exportShellCommand(cmd):
+# ------------------------------------------------------------------------------
+def export_shell_command(cmd):
     """
-    Exports the command for the calling bash shell script to process. Pretty simple, it just prints
-    the command.
+    Exports the command for the calling bash shell script to process. Pretty
+    simple, it just prints the command.
 
     :param cmd: The command to pass back to the calling shell script.
 
@@ -78,531 +80,551 @@ def exportShellCommand(cmd):
     print(cmd)
 
 
-# --------------------------------------------------------------------------------------------------
-def validatePermissions(path, shellPermissionBitsL):
+# ------------------------------------------------------------------------------
+def validate_permissions(path, legal_shell_permission_bits):
     """
-    Given a file name, verifies that the file is matches the permissions passed by a list given in
-    shellPermissionBitsL.
+    Given a file name, verifies that the file is matches the permissions passed
+    by a list given in shellPermissionBitsL.
 
     :param path: A path to the file to be validates.
-    :param shellPermissionBitsL: A list of permissions that are allowed. These should be passed as a
-           list of integers exactly as they would be used in a shell 'chmod' command.
-           For example: 644
+    :param legal_shell_permission_bits: A list of permissions that are allowed.
+           These should be passed as a list of integers exactly as they would be
+           used in a shell 'chmod' command. For example: 644
 
-    :return: True if the file matches any of the passed permission bits.  False otherwise.
+    :return: True if the file matches any of the passed permission bits.  False
+             otherwise.
     """
 
     # Contract
     assert(os.path.exists(path))
     assert(not(os.path.isdir(path)))
-    assert(type(shellPermissionBitsL) is list)
+    assert(type(legal_shell_permission_bits) is list)
 
     # Verify that the file is owned by root and is only writable by root.
     if os.stat(path).st_uid != 0:
         return False
 
-    if int(oct(os.stat(path).st_mode)[-3:]) not in shellPermissionBitsL:
+    if int(oct(os.stat(path).st_mode)[-3:]) not in legal_shell_permission_bits:
         return False
 
     return True
 
 
-# --------------------------------------------------------------------------------------------------
-def handlePermissionViolation(fileName):
+# ------------------------------------------------------------------------------
+def handle_permission_violation(file_name):
     """
-    Handles a permission violation for a particular file. Normally we just display an error message
-    and exit. But during development this is burdensome. So in that case, we might want to either
-    display the error but not exit, or not even display an error.
+    Handles a permission violation for a particular file. Normally we just
+    display an error message and exit. But during development this is
+    burdensome. So in that case, we might want to either display the error but
+    not exit, or not even display an error.
 
-    :param fileName: The name of the file that violated the permissions.
+    :param file_name: The name of the file that violated the permissions.
 
     :return: Nothing.
     """
 
-    if displayPermissionViolations:
-        displayError(fileName, " must be owned by root and only writable by root. Exiting.")
-    if enforcePermissions:
+    if DISPLAY_PERMISSIONS_VIOLATIONS:
+        display_error(
+            file_name,
+            " must be owned by root and only writable by root. Exiting.")
+    if ENFORCE_PERMISSIONS:
         sys.exit(1)
 
 
-# --------------------------------------------------------------------------------------------------
-def complete(stub, searchPathsL):
+# ------------------------------------------------------------------------------
+def complete(stub, search_paths):
     """
-    Given a stub, collects all of the use packages that start with this text. Exports these items to
-    stdOut as a newline-delimited string.
+    Given a stub, collects all of the use packages that start with this text.
+    Exports these items to stdOut as a newline-delimited string.
 
-    This is the corresponding bash function needed to provide tab completion using this feature:
+    This is the corresponding bash function needed to provide tab completion
+    using this feature:
     _funcName () {
         local files=`./thisScript.py complete "${COMP_WORDS[$COMP_CWORD]}"`
         COMPREPLY=( ${files[@]} )
     }
 
     :param stub: The characters we are matching
-    :param searchPathsL: The paths where use packages might live
+    :param search_paths: The paths where use packages might live
 
     :return: Nothing
     """
 
-    outputL = list()
-    usePackagesL = listUsePackages(searchPathsL)
-    for usePackage in usePackagesL:
+    outputs = list()
+    use_packages = list_all_use_package_files(search_paths)
+    for usePackage in use_packages:
         if usePackage.startswith(stub):
             output = os.path.splitext(usePackage)[0]
-            outputL.append(output)
-    exportShellCommand("\n".join(outputL))
+            outputs.append(output)
+    export_shell_command("\n".join(outputs))
 
 
-# --------------------------------------------------------------------------------------------------
-def listUsePackages(searchPathsL):
+# ------------------------------------------------------------------------------
+def list_all_use_package_files(search_paths):
     """
-    Returns a list of all use packages anywhere in the passed searchPathsL (list)
+    Returns a list of all use packages anywhere in the passed search_paths.
 
-    :param searchPathsL: A list of paths where the use packages could live.
+    :param search_paths: A list of paths where the use packages could live.
 
     :return: A list of use package names (deduplicated)
     """
 
-    usePackagesL = list()
-    for searchPath in searchPathsL:
-        fileNamesL = os.listdir(searchPath)
-        for fileName in fileNamesL:
+    use_package_files = list()
+    for searchPath in search_paths:
+        file_names = os.listdir(searchPath)
+        for fileName in file_names:
             if fileName.endswith(".use"):
-                usePackagesL.append(fileName)
-    return list(set(usePackagesL))
+                use_package_files.append(fileName)
+    return list(set(use_package_files))
 
 
-# --------------------------------------------------------------------------------------------------
-def getMatchingUsePkgs(usePkgName, searchPathsL):
+# ------------------------------------------------------------------------------
+def list_matching_use_package_files(use_package_name, search_paths):
     """
-    Given a baseName, tries to find matching baseName.use files in the searchPaths Returns a list
-    of full path to these files, resolving any symlinks along the way. Returns an empty list if the
-    file does not exist anywhere in the searchPaths.
+    Given a use_package_name, tries to find matching use_package_name.use files
+    in search_paths. Returns a list of full paths to these files, resolving any
+    symlinks along the way. Returns an empty list if no files match this pattern
+    anywhere in the searchPaths.
 
-    :param usePkgName: The base name of the use package. I.e. "clarisse" if you were looking for
-           clarisse.use
-    :param searchPathsL: A list of paths where the use packages could live.
+    :param use_package_name: The base name of the use package. I.e. "clarisse"
+           if you were looking for "clarisse-3.6sp5.use"
+    :param search_paths: A list of paths where the use packages could live.
 
-    :return: A list of full paths to (resolved) use package files that match this name. Empty if no
-             matches.
+    :return: A list of full paths to (resolved) use package files that match
+             this name. Empty if no matches.
     """
 
-    usePackagesL = list()
-    for searchPath in searchPathsL:
-        usePkg = os.path.join(searchPath, usePkgName + ".use")
-        if os.path.exists(usePkg):
-            usePackagesL.append(os.path.realpath(usePkg))
+    use_package_files = list()
+    for searchPath in search_paths:
+        use_package = os.path.join(searchPath, use_package_name + ".use")
+        if os.path.exists(use_package):
+            use_package_files.append(os.path.realpath(use_package))
 
-    return usePackagesL
+    return use_package_files
 
 
-# --------------------------------------------------------------------------------------------------
-def getActualUsePackage(usePkgName, usePkgSearchPathsL):
+# ------------------------------------------------------------------------------
+def get_use_package_file(use_package_name, search_paths):
     """
-    Given a specific usePkgName, returns the first one it can find among all that may match this
-    name.
+    Given a specific use_package_name, returns the first one it can find among
+    all that may match this name.
 
-    :param usePkgName: The name of the use package.
-    :param usePkgSearchPathsL: All the paths where this use package might live.
+    :param use_package_name: The name of the use package.
+    :param search_paths: All the paths where this use package might live.
 
-    :return: a use package object (configparser object)
+    :return: A full path to the use package file on disk.
     """
 
     # Find the use package file from this use package name
-    # Find use package file name on disk. If more than one, let the user know but just choose one
-    # and keep going
-    usePackagesL = getMatchingUsePkgs(usePkgName, usePkgSearchPathsL)
-    if not usePackagesL:
-        displayError("Cannot find", usePkgName, "in", str(usePkgSearchPathsL))
+    use_package_files = list_matching_use_package_files(use_package_name,
+                                                        search_paths)
+    if not use_package_files:
+        display_error("Cannot find", use_package_name, "in", str(search_paths))
         sys.exit(1)
-    if len(usePackagesL) > 1:
-        displayError("More than one use package matches this name. Using:", usePackagesL[0])
-    return usePackagesL[0]
+    if len(use_package_files) > 1:
+        display_error("More than one use package matches this name. Using:",
+                      use_package_files[0])
+    return use_package_files[0]
 
 
-# --------------------------------------------------------------------------------------------------
-def openAndVerifyUsePkgFileName(usePkgFileName):
+# ------------------------------------------------------------------------------
+def verify_read_use_package(use_package_file):
     """
-    Opens a use package file (given by usePkgFileName). Verifies the package's permissions first.
+    Opens a use package file (given by use_package_file). Verifies the package's
+    permissions first. Returns the use package as a configparser object twice.
+    Once delimited by '=', once undelimited.
 
-    :param usePkgFileName: The full path to the use package file.
+    :param use_package_file: The full path to the use package file.
 
-    :return: Tuple of config objects, the first elem is a configparser object delimited by '=',
-             the second is undelimited.
+    :return: Tuple of config objects, the first elem is a configparser object
+             delimited by '=', the second is undelimited.
     """
 
     # Verify the security of this file
-    if not validatePermissions(usePkgFileName, legalPermissionsL):
-        handlePermissionViolation(usePkgFileName)
+    if not validate_permissions(use_package_file, LEGAL_PERMISSIONS):
+        handle_permission_violation(use_package_file)
 
     # Read this use package file (both delimited and undelimited)
-    delimitedUse = readUsePkg(usePkgFileName, "=")
-    undelimitedUse = readUsePkg(usePkgFileName, "\n")
+    delimited_use_package_obj = read_use_package(use_package_file, "=")
+    undelimited_use_package_obj = read_use_package(use_package_file, "\n")
 
     # Return both
-    return delimitedUse, undelimitedUse
+    return delimited_use_package_obj, undelimited_use_package_obj
 
 
-# --------------------------------------------------------------------------------------------------
-def use_alias(usePkgObj):
+# ------------------------------------------------------------------------------
+def use_get_aliases(use_package_obj):
     """
     Generates the alias commands.
 
-    :param usePkgObj: The '=' delimited use package object.
+    :param use_package_obj: The '=' delimited use package object.
 
     :return: A string containing the bash shell command to set the alias'.
     """
 
-    aliasL = reformatKeyValuePairsWithQuotes(getAliases(usePkgObj))
-    aliasStr = ";".join(["alias " + item for item in aliasL])
-    return aliasStr
+    aliases = get_use_aliases(use_package_obj)
+    aliases = reformat_key_value_tuples_with_quotes(aliases)
+    alias = ";".join(["alias " + item for item in aliases])
+    return alias
 
 
-# --------------------------------------------------------------------------------------------------
-def getExistingAlias(usePkgObj):
+# ------------------------------------------------------------------------------
+def use_get_existing_aliases(use_package_obj):
     """
-    For the alias' listed in the usePkgObj, get a list of their current values. Return this as a
-    dictionary.
+    For the alias' listed in the use_package_obj, get a list of their current
+    values. Return this as a dictionary.
 
-    :param usePkgObj: The '=' delimited use package object.
+    :param use_package_obj: The '=' delimited use package object.
 
-    :return: A dictionary of key/value pairs for each alias. If an alias is undefined, then the
-             value will be blank.
+    :return: A dictionary of key/value pairs for each alias. If an alias is
+             undefined, then the value will be blank.
     """
 
     # Create a dict to store the existing alias'
-    outputD = dict()
+    outputs = dict()
 
     # Get the newly defined alias'
-    aliasL = getAliases(usePkgObj)
+    aliases = get_use_aliases(use_package_obj)
 
     # For each of these alias' try to find that same value in the current shell
-    for aliasT in aliasL:
+    for aliasT in aliases:
 
         # Check to see if the alias already exists
-        aliasName = aliasT[0]
+        alias_name = aliasT[0]
         try:
-            aliasValue = os.environ[aliasName]
+            alias_value = os.environ[alias_name]
         except KeyError:
-            aliasValue = ""
+            alias_value = ""
 
         # Add that alias to the dict
-        outputD[aliasName] = aliasValue
+        outputs[alias_name] = alias_value
 
-    return outputD
-
-
+    return outputs
 
 
-# --------------------------------------------------------------------------------------------------
-def use_env(usePkgObj):
+# ------------------------------------------------------------------------------
+def use_env(use_package_obj):
     """
     Generates the environmental variables.
 
-    :param usePkgObj: The '=' delimited use package object.
+    :param use_package_obj: The '=' delimited use package object.
 
-    :return: A string containing the bash shell command to set the env variables.
+    :return: A string containing the bash shell command to set the env
+             variables.
     """
 
-    envL = reformatKeyValuePairs(getEnv(usePkgObj))
-    envStr = ";".join(["export " + item for item in envL])
-    return envStr
+    env_vars = reformat_key_value_tuples(get_use_env_vars(use_package_obj))
+    env = ";".join(["export " + item for item in env_vars])
+    return env
 
 
-# --------------------------------------------------------------------------------------------------
-def use_path(usePkgObj):
+# ------------------------------------------------------------------------------
+def use_path(use_package_obj):
     """
-    Generates a new PATH variable with the prepend items prepended to the beginning and the postpend
-    items appended to the end (removes them from the rest of PATH if they already exist).
+    Generates a new PATH variable with the prepend items prepended to the
+    beginning and the postpend items appended to the end (removes them from the
+    rest of PATH if they already exist).
 
-    :param usePkgObj: The undelimited use package object.
+    :param use_package_obj: The undelimited use package object.
 
-    :return: A string containing the bash shell command to set the PATH env variable.
+    :return: A string containing the bash shell command to set the PATH env
+             variable.
     """
 
-    pathPrependsL = getPathPrepend(usePkgObj)
-    pathPostpendsL = getPathPostpend(usePkgObj)
-    existingPath = os.environ["PATH"]
+    path_prepends = get_use_path_prepends(use_package_obj)
+    path_postpends = get_use_path_postpends(use_package_obj)
+    existing_path = os.environ["PATH"]
 
     # Remove the prepend paths if they are already in the PATH
-    for pathPrepend in pathPrependsL:
-        existingPath = existingPath.replace(pathPrepend, "")
+    for pathPrepend in path_prepends:
+        existing_path = existing_path.replace(pathPrepend, "")
 
     # Remove the postpend paths if they are already in the PATH
-    for pathPostpend in pathPostpendsL:
-        existingPath = existingPath.replace(pathPostpend, "")
+    for pathPostpend in path_postpends:
+        existing_path = existing_path.replace(pathPostpend, "")
 
     # Add each prepend to the PATH
-    for pathPrepend in pathPrependsL:
-        existingPath = pathPrepend + ":" + existingPath
+    for pathPrepend in path_prepends:
+        existing_path = pathPrepend + ":" + existing_path
 
     # Add each postpend to the PATH
-    for pathPostpend in pathPostpendsL:
-        existingPath = existingPath + ":" + pathPostpend
+    for pathPostpend in path_postpends:
+        existing_path = existing_path + ":" + pathPostpend
 
     # Remove any doubled up : symbols
-    while "::" in existingPath:
-        existingPath = existingPath.replace("::", ":")
+    while "::" in existing_path:
+        existing_path = existing_path.replace("::", ":")
 
-    return "PATH=" + existingPath
+    return "PATH=" + existing_path
 
 
-# --------------------------------------------------------------------------------------------------
-def use_cmds(usePkgObj):
+# ------------------------------------------------------------------------------
+def use_cmds(use_package_obj):
     """
     Generates the free-form bash commands.
 
-    :param usePkgObj: The undelimited use package object.
+    :param use_package_obj: The undelimited use package object.
 
-    :return: A string containing the raw bash shell commands read from the use package file.
+    :return: A string containing the raw bash shell commands read from the use
+             package file.
     """
 
-    cmdsL = getCommands(usePkgObj)
-    cmdsStr = ";".join([item for item in cmdsL])
-    return cmdsStr
+    cmds = get_use_bash_cmds(use_package_obj)
+    cmd = ";".join([item for item in cmds])
+    return cmd
 
 
-# --------------------------------------------------------------------------------------------------
-def use(usePkgName, usePkgSearchPathsL, aliasL):
+# ------------------------------------------------------------------------------
+def use(use_package_name, search_paths, aliases):
     """
-    Uses a new package (given by usePkgName). Processes this file and exports the contents converted
-    into bash commands.
+    Uses a new package (given by use_package_obj). Processes this file and
+    exports the contents converted into bash commands.
 
-    :param usePkgName: A name of the use package (not the file name, just the package name. Eg:
-           clarisse-3.6sp2, and not clarisse-3.6sp2.use).
-    :param usePkgSearchPathsL: A list of paths where the use package might live.
-    :param aliasL: A python list of the existing alias' in the current shell.
+    :param use_package_name: A name of the use package (not the file name, just
+           the package name. (Eg: clarisse-3.6sp2, and not clarisse-3.6sp2.use).
+    :param search_paths: A list of paths where the use package might live.
+    :param aliases: A python list of the existing alias' in the current shell.
 
     :return: Nothing
     """
 
     # Find the use package file from this use package name
-    usePkgFileName = getActualUsePackage(usePkgName, usePkgSearchPathsL)
+    use_package_file = get_use_package_file(use_package_name, search_paths)
 
     # Read this use package file (both delimited and undelimited)
-    delimitedUse, undelimitedUse = openAndVerifyUsePkgFileName(usePkgFileName)
+    use_obj_delim, use_obj_undelim = verify_read_use_package(use_package_file)
 
-    # Extract the data from the package file and reformat it into a series of bash shell commands
-    bashCmd = ""
-    bashCmd += use_alias(delimitedUse) + ";"
-    bashCmd += use_env(delimitedUse) + ";"
-    bashCmd += use_path(undelimitedUse) + ";"
-    bashCmd += use_cmds(undelimitedUse)
-    while ";;" in bashCmd:
-        bashCmd.replace(";;", ";")
+    # Extract the data from the package file and reformat it into a series of
+    # bash shell commands
+    bash_cmd = ""
+    bash_cmd += use_get_aliases(use_obj_delim) + ";"
+    bash_cmd += use_env(use_obj_delim) + ";"
+    bash_cmd += use_path(use_obj_undelim) + ";"
+    bash_cmd += use_cmds(use_obj_undelim)
+    while ";;" in bash_cmd:
+        bash_cmd.replace(";;", ";")
 
-    displayError(getExistingAlias(delimitedUse))
+    display_error(use_get_existing_aliases(use_obj_delim))
 
     # Write out the history
-    writeHistory(usePkgName, usePkgSearchPathsL, aliasL)
+    write_history(use_package_name, use_obj_delim, use_obj_undelim, aliases)
 
     # Export the bash command
-    exportShellCommand(bashCmd)
+    export_shell_command(bash_cmd)
 
 
-# --------------------------------------------------------------------------------------------------
-def readUsePkg(usePkgFileName, *delimiters):
+# ------------------------------------------------------------------------------
+def read_use_package(use_package_file, *delimiters):
     """
-    Reads in the contents of a use package and returns it in the form of a configparser object
-    (.ini file)
+    Reads in the contents of a use package and returns it in the form of a
+    configparser object (.ini file)
 
-    :param usePkgFileName: The use package to read.
-    :param delimiters: A list of different delimiters to use. If empty, then the default of "\n"
-           will be used.
+    :param use_package_file: The use package to read.
+    :param delimiters: A list of different delimiters to use. If empty, then the
+           default of "\n" will be used.
 
     :return: A configparser object.
     """
 
     if not delimiters:
         delimiters = tuple("\n")
-    useConfig = configparser.ConfigParser(allow_no_value=True, delimiters=delimiters)
-    useConfig.optionxform = str # Force configparser to maintain capitalization of keys
-    useConfig.read(usePkgFileName)
 
-    return useConfig
+    use_package_obj = configparser.ConfigParser(allow_no_value=True,
+                                                delimiters=delimiters)
+
+    # Force configparser to maintain capitalization of keys
+    use_package_obj.optionxform = str
+    use_package_obj.read(use_package_file)
+
+    return use_package_obj
 
 
-# --------------------------------------------------------------------------------------------------
-def getAliases(useConfig):
+# ------------------------------------------------------------------------------
+def get_use_aliases(use_package_obj):
     """
     Returns all of the alias commands from the useConfig
 
-    :param useConfig: The config parser object.
+    :param use_package_obj: The config parser object.
 
     :return: Nothing
     """
 
     try:
-        return useConfig.items("alias")
+        return use_package_obj.items("alias")
     except configparser.NoSectionError:
         return []
 
 
-# --------------------------------------------------------------------------------------------------
-def getEnv(useConfig):
+# ------------------------------------------------------------------------------
+def get_use_env_vars(use_package_obj):
     """
-    Returns all of the env settings from the useConfig
+    Returns all of the environment variable settings from the useConfig
 
-    :param useConfig: The config parser object.
+    :param use_package_obj: The config parser object.
 
     :return: Nothing
     """
 
     try:
-        return useConfig.items("env")
+        return use_package_obj.items("env")
     except configparser.NoSectionError:
         return []
 
 
-# --------------------------------------------------------------------------------------------------
-def getPathPrepend(useConfig):
+# ------------------------------------------------------------------------------
+def get_use_path_prepends(use_package_obj):
     """
     Returns the paths to prepend to $PATH from the useConfig
 
-    :param useConfig: The config parser object. This should be one that is read without delimiters
+    :param use_package_obj: The config parser object. This should be one that is
+           read without delimiters
 
     :return: Nothing
     """
 
     try:
-        return reformatNoValueSecition(useConfig.items("path-prepend"))
+        return reformat_no_value_tuples(use_package_obj.items("path-prepend"))
     except (configparser.NoSectionError, configparser.NoOptionError):
         return []
 
 
-# --------------------------------------------------------------------------------------------------
-def getPathPostpend(useConfig):
+# ------------------------------------------------------------------------------
+def get_use_path_postpends(use_package_obj):
     """
     Returns the paths to postpend to $PATH from the useConfig
 
-    :param useConfig: The config parser object. This should be one that is read without delimiters
+    :param use_package_obj: The config parser object. This should be one that is
+           read without delimiters
 
     :return: A list containing all of the lines in the path-postpend section.
     """
 
     try:
-        return reformatNoValueSecition(useConfig.items("path-postpend"))
+        return reformat_no_value_tuples(use_package_obj.items("path-postpend"))
     except (configparser.NoSectionError, configparser.NoOptionError):
         return []
 
 
-# --------------------------------------------------------------------------------------------------
-def getCommands(useConfig):
+# ------------------------------------------------------------------------------
+def get_use_bash_cmds(use_package_obj):
     """
     Returns any additional shell commands to run from the useConfig
 
-    :param useConfig: The config parser object. This should be one that is read without delimiters
+    :param use_package_obj: The config parser object. This should be one that is
+           read without delimiters
 
     :return: A list containing all of the lines in the cmds section
     """
 
     try:
-        return reformatNoValueSecition(useConfig.items("cmds"))
+        return reformat_no_value_tuples(use_package_obj.items("cmds"))
     except configparser.NoSectionError:
         return []
 
 
-# --------------------------------------------------------------------------------------------------
-def writeHistory(usePkgName, usePkgSearchPathsL, aliasL):
+# ------------------------------------------------------------------------------
+def write_history(use_package_file, use_obj_delim, use_obj_undelim, aliases):
     """
     Writes the current use command to the temp history file.
 
-    :param usePkgName: The name of the use package for which we are storing history
-    :param usePkgSearchPathsL: A list of paths where the use packages may be found.
-    :param aliasL: A list of all the alias' in the current shell.
+    :param use_package_file: The full name of the use package.
+    :param use_obj_delim: A configparser object of the use package, delimited
+           by '='.
+    :param use_obj_undelim: A configparser object of the use package, delimited
+           by "\n".
+    :param aliases: A list of all the alias' in the current shell.
 
     :return: Nothing
     """
 
     # Make sure the history file exists and that we can find it
     try:
-        historyFile = os.environ["USE_HISTORY_FILE"]
+        history_file = os.environ["USE_HISTORY_FILE"]
     except KeyError:
-        displayError("No history file. Did you forget to run setup first?")
+        display_error("No history file. Did you forget to run setup first?")
         sys.exit(1)
-    if not os.path.exists(historyFile):
-        displayError("History file", historyFile, "does not exist. Did setup fail?")
+    if not os.path.exists(history_file):
+        display_error("History file",
+                      history_file,
+                      "does not exist. Did setup fail?")
         sys.exit(1)
-
-    displayError(aliasL.split("\n"))
-
-    # Get the actual use package file name
-    usePkgFileName = getActualUsePackage(usePkgName, usePkgSearchPathsL)
-
-    # Open it up in both delimited and undelimited formats
-    delimitedUsePkgObj = readUsePkg(usePkgFileName, "=")
-    unDelimitedUsePkgObj = readUsePkg(usePkgFileName, "\n")
 
     # Build the history dict
-    outputD = dict()
-    outputD["usePkgName"] = usePkgName
-    outputD["alias"] = getAliases(delimitedUsePkgObj)
-    outputD["env"] = getEnv(delimitedUsePkgObj)
-    outputD["path-prepend"] = getPathPrepend(unDelimitedUsePkgObj)
-    outputD["path-postpend"] = getPathPostpend(unDelimitedUsePkgObj)
-    outputD["cmds"] = getCommands(unDelimitedUsePkgObj)
+    outputs = dict()
+    outputs["use_package_file"] = use_package_file
+    outputs["alias"] = get_use_aliases(use_obj_delim)
+    outputs["env"] = get_use_env_vars(use_obj_delim)
+    outputs["path-prepend"] = get_use_path_prepends(use_obj_undelim)
+    outputs["path-postpend"] = get_use_path_postpends(use_obj_undelim)
+    outputs["cmds"] = get_use_bash_cmds(use_obj_undelim)
+
+    display_error(aliases)
 
     # Open the history command for appending and write out the history string
-    f = open(historyFile, "a")
-    f.write(str(outputD) + "\n")
+    f = open(history_file, "a")
+    f.write(str(outputs) + "\n")
     f.close()
 
 
-# --------------------------------------------------------------------------------------------------
-def reformatKeyValuePairsWithQuotes(valuesL):
+# ------------------------------------------------------------------------------
+def reformat_key_value_tuples_with_quotes(key_values):
     """
-    Given a list of tuples, returns a list of strings with key=value pairs. Returns the value in
-    double quotes (as required by the bash alias command).
+    Given a list of tuples, returns a list of strings with key=value pairs.
+    Returns the value in quotes (as required by the bash alias command).
 
-    :param valuesL: The list of tuples
+    :param key_values: The list of key/value tuples
 
-    :return: A list of strings of key=value pairs where the value is enclosed in quotes (as required
-             by the bash alias command).
+    :return: A list of strings of key=value pairs where the value is enclosed in
+             quotes (as required by the bash alias command).
     """
 
-    outputL = list()
-    for item in valuesL:
-        outputL.append(item[0] + '="' + item[1] + '"')
-    return outputL
+    outputs = list()
+    for item in key_values:
+        outputs.append(item[0] + '="' + item[1] + '"')
+    return outputs
 
 
-# --------------------------------------------------------------------------------------------------
-def reformatKeyValuePairs(valuesL):
+# ------------------------------------------------------------------------------
+def reformat_key_value_tuples(key_values):
     """
     Given a list of tuples, returns a list of strings with key=value pairs.
 
-    :param valuesL: The list of tuples
+    :param key_values: The list of key/value tuples
 
     :return: A list of strings of key=value pairs.
     """
 
-    outputL = list()
-    for item in valuesL:
-        outputL.append(item[0] + "=" + item[1])
-    return outputL
+    outputs = list()
+    for item in key_values:
+        outputs.append(item[0] + "=" + item[1])
+    return outputs
 
 
-# --------------------------------------------------------------------------------------------------
-def reformatNoValueSecition(valuesL):
+# ------------------------------------------------------------------------------
+def reformat_no_value_tuples(key_values):
     """
-    When reading a section that has a simple list (i.e. just text without delimiters or key/value
-    pairs), configparser loads the data in a list of tuples. This reconstructs it into a list of
-    strings to match how a normal key/value section is presented.
+    When reading a section that has a simple list (i.e. just text without
+    delimiters or key/value pairs), configparser loads the data in a list of
+    tuples where the second element in the tuple is empty. This reconstructs
+    this into a list of strings to match how a normal key/value section is
+    presented.
 
-    :param valuesL: The list of tuples to reconstruct.
+    :param key_values: The list of key/value tuples to reconstruct.
 
     :return: A list of strings.
     """
 
-    outputL = list()
-    for item in valuesL:
-        outputL.append(item[0])
-    return outputL
+    outputs = list()
+    for item in key_values:
+        outputs.append(item[0])
+    return outputs
 
 
-# --------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 def used():
     """
-    Reads the history file and returns a list of all used packages in the current shell.
+    Reads the history file and returns a list of all used packages in the
+    current shell.
 
     :return: Nothing.
     """
@@ -611,7 +633,7 @@ def used():
     try:
         use_history_file = os.environ["USE_HISTORY_FILE"]
     except KeyError:
-        displayError("Unable to locate a use history file")
+        display_error("Unable to locate a use history file")
         sys.exit(1)
 
     # Read in the whole file into a single list
@@ -629,88 +651,69 @@ def used():
     used_pkg_names.sort()
 
     # Export the shell command to display these items
-    exportShellCommand('printf "' + r'\n'.join(used_pkg_names) + r'\n' + '"')
+    export_shell_command('printf "' + r'\n'.join(used_pkg_names) + r'\n' + '"')
 
 
-# --------------------------------------------------------------------------------------------------
+# ------------------------------------------------------------------------------
 def setup():
     """
-    Does the setup for the current shell. Needs to be run once per shell before the system is
-    usable.
+    Does the setup for the current shell. Needs to be run once per shell before
+    the system is usable.
 
-    :return: An environmental variable USE_HISTORY_FILE with a path to a text file that contains the
-             history of use commands for the current session.
+    :return: An environmental variable USE_HISTORY_FILE with a path to a text
+             file that contains the history of use commands for the current
+             session.
     """
 
-    # Check to see if there is already a use history file for this shell. Create one if needed.
+    # Check to see if there is already a use history file for this shell.
+    # Create one if needed.
     try:
         use_history_file = os.environ["USE_HISTORY_FILE"]
     except KeyError:
         f, use_history_file = tempfile.mkstemp(suffix=".usehistory", text=True)
 
     # Store this file name in the form of an environmental variable.
-    output ="export USE_HISTORY_FILE=" + use_history_file
+    output = "export USE_HISTORY_FILE=" + use_history_file
 
     # Read in the existing USE_PKG_PATH
     try:
-        usePkgPath = os.environ["USE_PKG_PATH"]
+        use_package_path = os.environ["USE_PKG_PATH"]
     except KeyError:
-        usePkgPath = ":".join(defaultUsePkgPathsL)
+        use_package_path = ":".join(DEFAULT_USE_PKG_PATHS)
 
     # Convert it into a list
-    usePkgPathsL = usePkgPath.split(":")
+    use_package_paths = use_package_path.split(":")
 
-    legalPathFound = False
-    for path in usePkgPathsL:
+    legal_path_found = False
+    for path in use_package_paths:
         if os.path.exists(path) and os.path.isdir(path):
-            legalPathFound = True
+            legal_path_found = True
 
-    if not legalPathFound:
-        displayError("No use package directory found. I looked for:", ":".join(usePkgPathsL))
+    if not legal_path_found:
+        display_error("No use package directory found. I looked for:",
+                      ":".join(use_package_paths))
         sys.exit(1)
 
     # Store the use package paths
-    output += ";export USE_PKG_PATH=" + ":".join(usePkgPathsL)
+    output += ";export USE_PKG_PATH=" + ":".join(use_package_paths)
 
     # Export these env variables.
-    exportShellCommand(output)
+    export_shell_command(output)
 
 
-
-
-# ==================================================================================================
-# ==================================================================================================
+# ==============================================================================
+# ==============================================================================
 if __name__ == "__main__":
 
     # Make sure this script is owned by root and only writable by root.
     # TODO: Wrap this to check for assertion error
-    if not validatePermissions(os.path.abspath(__file__), legalPermissionsL):
-        handlePermissionViolation(os.path.abspath(__file__))
-
-    LEGAL_COMMANDS = {
-        "setup": setup,
-        "complete": complete,
-        "use":
-        "used":
-        "unuse":
-        "which":
-        "config":
-        "writehistory":
-        "processStdIn":
-    }
+    if not validate_permissions(os.path.abspath(__file__), LEGAL_PERMISSIONS):
+        handle_permission_violation(os.path.abspath(__file__))
 
     # Only handle specific types of requests
     if sys.argv[1] not in LEGAL_COMMANDS:
-        displayError("Unknown command.")
+        display_error("Unknown command.")
         display_usage()
-    else:
-        LEGAL_COMMANDS.get
-
-    try:
-        funcname = LEGAL_COMMANDS[sys.argv[1]]
-    except KeyError:
-        displayError()
-    funcname()
 
     # SETUP
     # ===========================
@@ -722,20 +725,24 @@ if __name__ == "__main__":
     try:
         use_pkg_path = os.environ["USE_PKG_PATH"]
     except KeyError:
-        displayError("Missing USE_PKG_PATH env variable (where use packages live). Exiting.")
+        display_error("Missing USE_PKG_PATH env variable (where use packages "
+                      "live). Exiting.")
         sys.exit(1)
     if ":" in use_pkg_path:
-        usePackageSearchPathsL = use_pkg_path.split(":")
+        use_package_search_paths = use_pkg_path.split(":")
     else:
-        usePackageSearchPathsL = [use_pkg_path]
+        use_package_search_paths = [use_pkg_path]
 
     # ===========================
     if sys.argv[1] == "complete":
-        complete(sys.argv[2], usePackageSearchPathsL)
+        complete(sys.argv[2],
+                 use_package_search_paths)
 
     # ===========================
     if sys.argv[1] == "use":
-        use(sys.argv[3], usePackageSearchPathsL, ast.literal_eval(sys.argv[2]))
+        use(sys.argv[3],
+            use_package_search_paths,
+            ast.literal_eval(sys.argv[2]))
 
     # ===========================
     if sys.argv[1] == "used":
@@ -743,12 +750,8 @@ if __name__ == "__main__":
 
     # ===========================
     if sys.argv[1] == "unuse":
-        use(sys.argv[3], sys.argv[2])
-
-    # ===========================
-    if sys.argv[1] == "writehistory":
-        writeHistory(sys.argv[2], usePackageSearchPathsL)
+        pass
 
     # ===========================
     if sys.argv[1] == "processStdIn":
-        exportStdIn()
+        export_stdin()
