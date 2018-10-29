@@ -7,20 +7,19 @@ import sys
 import tempfile
 
 
-legalCommandsL = ["setup",
-                  "complete",
-                  "use",
-                  "used",
-                  "unuse",
-                  "which",
-                  "config",
-                  "writehistory",
-                  "processStdIn"]
+#LEGAL_COMMANDS = ["setup",
+#                  "complete",
+#                  "use",
+#                  "used",
+#                   "unuse",
+#                   "which",
+#                   "config",
+#                   "writehistory",
+#                   "processStdIn"]
 legalPermissionsL = [644, 744, 754, 755, 654, 655, 645]
 enforcePermissions = False
 displayPermissionViolations = False
 defaultUsePkgPathsL = ["/opt/use", "/home/bvz/Documents/dev/use/"]
-
 
 
 # --------------------------------------------------------------------------------------------------
@@ -35,7 +34,7 @@ def exportStdIn():
 
 
 # --------------------------------------------------------------------------------------------------
-def displayUsage():
+def display_usage():
     """
     Prints the usage string. Note: because most of the output of this script is intended to be
     processed by a calling shell script using 'eval', the usage string will be printed to stdErr
@@ -610,27 +609,27 @@ def used():
 
     # Open the history file
     try:
-        useHistoryFile = os.environ["USE_HISTORY_FILE"]
+        use_history_file = os.environ["USE_HISTORY_FILE"]
     except KeyError:
         displayError("Unable to locate a use history file")
         sys.exit(1)
 
     # Read in the whole file into a single list
-    f = open(useHistoryFile, "r")
-    linesL = f.readlines()
+    f = open(use_history_file, "r")
+    lines = f.readlines()
     f.close()
 
     # Step through the list and convert it to
-    usedPkgNamesL = list()
-    for line in linesL:
-        usedPkgNamesL.append(ast.literal_eval(line)["usePkgName"])
+    used_pkg_names = list()
+    for line in lines:
+        used_pkg_names.append(ast.literal_eval(line)["usePkgName"])
 
     # Remove duplicates
-    usedPkgNamesL = list(set(usedPkgNamesL))
-    usedPkgNamesL.sort()
+    used_pkg_names = list(set(used_pkg_names))
+    used_pkg_names.sort()
 
     # Export the shell command to display these items
-    exportShellCommand('printf "' + r'\n'.join(usedPkgNamesL) + r'\n' + '"')
+    exportShellCommand('printf "' + r'\n'.join(used_pkg_names) + r'\n' + '"')
 
 
 # --------------------------------------------------------------------------------------------------
@@ -681,54 +680,75 @@ def setup():
 
 # ==================================================================================================
 # ==================================================================================================
+if __name__ == "__main__":
 
-# Make sure this script is owned by root and only writable by root.
-# TODO: Wrap this to check for assertion error
-if not validatePermissions(os.path.abspath(__file__), legalPermissionsL):
-    handlePermissionViolation(os.path.abspath(__file__))
+    # Make sure this script is owned by root and only writable by root.
+    # TODO: Wrap this to check for assertion error
+    if not validatePermissions(os.path.abspath(__file__), legalPermissionsL):
+        handlePermissionViolation(os.path.abspath(__file__))
 
-# Only handle specific types of requests
-if sys.argv[1] not in legalCommandsL:
-    displayError("Unknown command.")
-    displayUsage()
+    LEGAL_COMMANDS = {
+        "setup": setup,
+        "complete": complete,
+        "use":
+        "used":
+        "unuse":
+        "which":
+        "config":
+        "writehistory":
+        "processStdIn":
+    }
 
-# SETUP
-# ===========================
-if sys.argv[1] == "setup":
-    setup()
-    sys.exit(0)
+    # Only handle specific types of requests
+    if sys.argv[1] not in LEGAL_COMMANDS:
+        displayError("Unknown command.")
+        display_usage()
+    else:
+        LEGAL_COMMANDS.get
 
-# Read some system-wide env variables (this MUST come after we run setup)
-try:
-    use_pkg_path = os.environ["USE_PKG_PATH"]
-except KeyError:
-    displayError("Missing USE_PKG_PATH env variable (where use packages live). Exiting.")
-    sys.exit(1)
-if ":" in use_pkg_path:
-    usePackageSearchPathsL = use_pkg_path.split(":")
-else:
-    usePackageSearchPathsL = [use_pkg_path]
+    try:
+        funcname = LEGAL_COMMANDS[sys.argv[1]]
+    except KeyError:
+        displayError()
+    funcname()
 
-# ===========================
-if sys.argv[1] == "complete":
-    complete(sys.argv[2], usePackageSearchPathsL)
+    # SETUP
+    # ===========================
+    if sys.argv[1] == "setup":
+        setup()
+        sys.exit(0)
 
-# ===========================
-if sys.argv[1] == "use":
-    use(sys.argv[3], usePackageSearchPathsL, ast.literal_eval(sys.argv[2]))
+    # Read some system-wide env variables (this MUST come after we run setup)
+    try:
+        use_pkg_path = os.environ["USE_PKG_PATH"]
+    except KeyError:
+        displayError("Missing USE_PKG_PATH env variable (where use packages live). Exiting.")
+        sys.exit(1)
+    if ":" in use_pkg_path:
+        usePackageSearchPathsL = use_pkg_path.split(":")
+    else:
+        usePackageSearchPathsL = [use_pkg_path]
 
-# ===========================
-if sys.argv[1] == "used":
-    used()
+    # ===========================
+    if sys.argv[1] == "complete":
+        complete(sys.argv[2], usePackageSearchPathsL)
 
-# ===========================
-if sys.argv[1] == "unuse":
-    use(sys.argv[3], sys.argv[2])
+    # ===========================
+    if sys.argv[1] == "use":
+        use(sys.argv[3], usePackageSearchPathsL, ast.literal_eval(sys.argv[2]))
 
-# ===========================
-if sys.argv[1] == "writehistory":
-    writeHistory(sys.argv[2], usePackageSearchPathsL)
+    # ===========================
+    if sys.argv[1] == "used":
+        used()
 
-# ===========================
-if sys.argv[1] == "processStdIn":
-    exportStdIn()
+    # ===========================
+    if sys.argv[1] == "unuse":
+        use(sys.argv[3], sys.argv[2])
+
+    # ===========================
+    if sys.argv[1] == "writehistory":
+        writeHistory(sys.argv[2], usePackageSearchPathsL)
+
+    # ===========================
+    if sys.argv[1] == "processStdIn":
+        exportStdIn()
