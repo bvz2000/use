@@ -1,0 +1,18 @@
+[alias]
+blender=/opt/apps/blender/blender/2.79/blender
+runblender = /opt/apps/blender/blender/2.79/blender
+
+[env]
+BLENDER_HOME=/opt/apps/blender/blender/2.79/
+BLENDER_OTHER_HOME=/this/that
+
+[path-prepend]
+/opt/apps/blender/blender/2.79/
+
+[path-postpend]
+/POSTPEND1/
+/POSTPEND2
+
+[cmds]
+ls -al
+alias test3='ls -l'
