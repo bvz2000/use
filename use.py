@@ -365,6 +365,22 @@ def get_bash_cmds(use_pkg_obj):
 
 
 # ------------------------------------------------------------------------------
+def get_unuse(use_pkg_obj):
+    """
+    Returns all of the unuse commands from the use_pkg_obj.
+
+    :param use_pkg_obj: The config parser object, undelimited.
+
+    :return: A list of key/value tuples containing all of the unuse commands.
+    """
+
+    try:
+        return use_pkg_obj.items("unuse")
+    except configparser.NoSectionError:
+        return []
+
+
+# ------------------------------------------------------------------------------
 def format_aliases_for_shell(aliases):
     """
     Formats the aliases that are read directly from the config object as a
@@ -559,7 +575,7 @@ def get_existing_path():
 # ------------------------------------------------------------------------------
 def write_history(use_pkg_file, branches, new_aliases, new_env_vars,
                   new_path_prepends, new_path_postpends, cmds, existing_aliases,
-                  existing_env_vars, existing_path):
+                  existing_env_vars, existing_path, unuse_cmds):
     """
     Writes the actions being taken by the current use package to a temp history
     file. Also includes any existing aliases, env vars, and paths that may be
@@ -585,6 +601,8 @@ def write_history(use_pkg_file, branches, new_aliases, new_env_vars,
            env vars that will be overwritten by the new env vars in this use
            package.
     :param existing_path: The existing path.
+    :param unuse_cmds: A list of key/value tuples listing the bash shell
+           commands to be run when doing an unuse of this use package.
 
     :return: Nothing
     """
@@ -614,6 +632,7 @@ def write_history(use_pkg_file, branches, new_aliases, new_env_vars,
     history["existing_aliases"] = existing_aliases
     history["existing_env_vars"] = existing_env_vars
     history["existing_path"] = existing_path
+    history["unuse"] = unuse_cmds
 
     # Open the history command for appending and write out the history string
     f = open(history_file, "a")
@@ -648,9 +667,11 @@ def use(use_pkg_name, search_paths, stdin):
     path_prepends = get_path_prepends(use_obj_undelim)
     path_postpends = get_path_postpends(use_obj_undelim)
     cmds = get_bash_cmds(use_obj_undelim)
+    unuse_cmds = get_unuse(use_obj_undelim)
 
     # Extract the data from the package file and reformat it into a series of
-    # bash shell commands
+    # bash shell commands that will be passed back as a single, semi-colon
+    # delimited command.
     bash_cmd = ""
     bash_cmd += format_aliases_for_shell(aliases) + ";"
     bash_cmd += format_env_vars_for_shell(env_vars) + ";"
@@ -680,7 +701,7 @@ def use(use_pkg_name, search_paths, stdin):
     # Write out the history
     write_history(use_pkg_name, branches, aliases, env_vars, path_prepends,
                   path_postpends, path_postpends, matched_aliases,
-                  matched_env_vars, existing_path)
+                  matched_env_vars, existing_path, unuse_cmds)
 
     # Export the bash command
     export_shell_command(bash_cmd)
