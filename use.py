@@ -708,6 +708,28 @@ def use(use_pkg_name, search_paths, stdin):
 
 
 # ------------------------------------------------------------------------------
+def read_history(history_file):
+    """
+    Reads in the history file given by history_file.
+
+    :param history_file: The full path to the file to be read.
+
+    :return: A list of dictionary objects containing the contents of the history
+             file.
+    """
+
+    f = open(history_file, "r")
+    lines = f.readlines()
+    f.close()
+
+    history = list()
+    for line in lines:
+        history.append(ast.literal_eval(line))
+
+    return history
+
+
+# ------------------------------------------------------------------------------
 def used():
     """
     Reads the history file and returns a list of all used packages in the
@@ -724,14 +746,12 @@ def used():
         sys.exit(1)
 
     # Read in the whole file into a single list
-    f = open(use_history_file, "r")
-    lines = f.readlines()
-    f.close()
+    history = read_history(use_history_file)
 
     # Step through the list and convert it to
     used_pkg_names = list()
-    for line in lines:
-        used_pkg_names.append(ast.literal_eval(line)["usePkgName"])
+    for item in history:
+        used_pkg_names.append(item["use_package"])
 
     # Remove duplicates
     used_pkg_names = list(set(used_pkg_names))
