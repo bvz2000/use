@@ -6,8 +6,11 @@ if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     exit 1
 fi
 
+# Get the path to this shell script
+me=`realpath $BASH_SOURCE`
+
 # Get the path to the python script
-python_script="$( cd "$( dirname "$0" )" && pwd )/use.py"
+python_script="`dirname $me`/use.py"
 
 
 
@@ -48,10 +51,10 @@ if [ "$1" == "setup" ]; then
     complete -F _unuse unuse
 
     # Create alias' for each of the possible commands
-    alias use="source $BASH_SOURCE use"
-    alias unuse="source $BASH_SOURCE unuse"
-    alias used="source $BASH_SOURCE used"
-    alias useconfig="$BASH_SOURCE config"
+    alias use="source $me use"
+    alias unuse="source $me unuse"
+    alias used="source $me used"
+    alias useconfig="$me config"
 
     return 0
 
@@ -64,14 +67,14 @@ fi
 if [ "$1" == "use" ]; then
 
     # Call the python script for all of the data we need
-    aliasList=`alias | $python_script processStdIn`
-    eval `$python_script use $aliasList $2`
+    #aliasList=`alias | $python_script processStdIn`
+    eval `alias | $python_script use $2`
 
 fi
 
 
 # ==============================================================================
-# use
+# used
 # ==============================================================================
 
 if [ "$1" == "used" ]; then
