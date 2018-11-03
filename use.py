@@ -8,8 +8,10 @@ import sys
 import tempfile
 
 LEGAL_COMMANDS = [
-    "complete",
+    "complete_unuse",
+    "complete_use",
     "config",
+    "package_from_branch",
     "setup",
     "unuse",
     "use",
@@ -140,7 +142,7 @@ def list_all_use_pkg_files(search_paths):
 
 
 # ------------------------------------------------------------------------------
-def complete(stub, search_paths):
+def complete_use(stub, search_paths):
     """
     Given a stub, collects all of the use packages that start with this text.
     Exports these items to stdOut as a newline-delimited string.
@@ -148,7 +150,7 @@ def complete(stub, search_paths):
     This is the corresponding bash function needed to provide tab completion
     using this feature:
     _funcName () {
-        local files=`./thisScript.py complete "${COMP_WORDS[$COMP_CWORD]}"`
+        local files=`./thisScript.py complete_use "${COMP_WORDS[$COMP_CWORD]}"`
         COMPREPLY=( ${files[@]} )
     }
 
@@ -164,6 +166,32 @@ def complete(stub, search_paths):
         if use_pkg.startswith(stub):
             output = os.path.splitext(use_pkg)[0]
             outputs.append(output)
+    export_shell_command("\n".join(outputs))
+
+
+# ------------------------------------------------------------------------------
+def complete_unuse(stub):
+    """
+    Given a stub, collects all of the use packages that have already been used
+    that start with this stub.
+
+    This is the corresponding bash function needed to provide tab completion
+    using this feature:
+    _funcName () {
+        local pkgs=`./thisScript.py complete_unuse "${COMP_WORDS[$COMP_CWORD]}"`
+        COMPREPLY=( ${pkgs[@]} )
+    }
+
+    :param stub: The characters we are matching
+
+    :return: Nothing
+    """
+
+    outputs = list()
+    use_pkgs = get_used()
+    for use_pkg in use_pkgs:
+        if use_pkg.startswith(stub):
+            outputs.append(use_pkg)
     export_shell_command("\n".join(outputs))
 
 
@@ -266,6 +294,29 @@ def verify_and_read_use_pkg(use_pkg_file):
 
     # Return both
     return delimited_use_pkg_obj, undelimited_use_pkg_obj
+
+
+# ------------------------------------------------------------------------------
+def format_existing_aliases(raw_aliases):
+    """
+    Given a list of strings containing the alias definitions, formats it into
+    a list of key/value tuples.
+
+    :param raw_aliases: A string containing all of the current aliases.
+
+    :return: A list of key/value tuples.
+    """
+
+    # Convert the stdin to a list of existing aliases
+    existing_aliases = list()
+    for existing_alias in list(raw_aliases):
+        existing_aliases.append(existing_alias.rstrip("\n"))
+
+    # Reformat the existing aliases to be a list of key/value tuples
+    # (this makes it match the format that the other data is stored in as well)
+    existing_aliases = reformat_existing_aliases(existing_aliases)
+
+    return existing_aliases
 
 
 # ------------------------------------------------------------------------------
@@ -499,7 +550,7 @@ def reformat_existing_aliases(existing_aliases):
     for existing_alias in existing_aliases:
         match_obj = re.match(pattern, existing_alias)
         if match_obj is not None:
-            reformatted_aliases.append((match_obj[2], match_obj[4]))
+            reformatted_aliases.append((match_obj[2], match_obj[4].strip("'")))
 
     return reformatted_aliases
 
@@ -561,7 +612,7 @@ def get_matching_env_vars(new_env_vars):
 # ------------------------------------------------------------------------------
 def get_existing_path():
     """
-    Extracts the existing path from the calling shell.
+    Extracts the existing value of $PATH from the calling shell.
 
     :return: The current path string.
     """
@@ -641,7 +692,7 @@ def write_history(use_pkg_file, branches, new_aliases, new_env_vars,
 
 
 # ------------------------------------------------------------------------------
-def use(use_pkg_name, search_paths, stdin):
+def use(use_pkg_name, search_paths, raw_aliases):
     """
     Uses a new package (given by use_pkg_name). Processes this file and exports
     the contents converted into bash commands.
@@ -649,7 +700,7 @@ def use(use_pkg_name, search_paths, stdin):
     :param use_pkg_name: A name of the use package (not the file name, just
            the package name. (Eg: clarisse-3.6sp2, and not clarisse-3.6sp2.use).
     :param search_paths: A list of paths where the use package might live.
-    :param stdin: The contents of the stdin.
+    :param raw_aliases: The contents of the stdin.
 
     :return: Nothing
     """
@@ -668,6 +719,11 @@ def use(use_pkg_name, search_paths, stdin):
     path_postpends = get_path_postpends(use_obj_undelim)
     cmds = get_bash_cmds(use_obj_undelim)
     unuse_cmds = get_unuse(use_obj_undelim)
+    #
+    # # Find the last used package in this branch and unuse it
+    # prev_use_pkg = get_use_pkg_name_from_branch()
+    # if prev_use_pkg is not None:
+    #     unuse(prev_use_pkg, stdin)
 
     # Extract the data from the package file and reformat it into a series of
     # bash shell commands that will be passed back as a single, semi-colon
@@ -680,14 +736,9 @@ def use(use_pkg_name, search_paths, stdin):
     while ";;" in bash_cmd:
         bash_cmd.replace(";;", ";")
 
-    # Convert the stdin to a list of existing aliases
-    existing_aliases = list()
-    for existing_alias in list(stdin):
-        existing_aliases.append(existing_alias.rstrip("\n"))
-
     # Reformat the existing aliases to be a list of key/value tuples
     # (this makes it match the format that the other data is stored in as well)
-    existing_aliases = reformat_existing_aliases(existing_aliases)
+    existing_aliases = format_existing_aliases(raw_aliases)
 
     # Get a list of aliases in the current shell that match those being reset
     matched_aliases = get_matching_aliases(aliases, existing_aliases)
@@ -730,12 +781,39 @@ def read_history(history_file):
 
 
 # ------------------------------------------------------------------------------
-def used():
+def remove_history(history_file, remove_line):
+    """
+    Reads in the history file given by history_file, finds the line that matches
+    the remove_line line, and then writes history back out without this line.
+
+    :param history_file: The full path to the file to be read.
+    :param remove_line: The line that is to be removed.
+
+    :return: Nothing.
+    """
+
+    f = open(history_file, "r")
+    lines = f.readlines()
+    f.close()
+
+    history = list()
+    for line in lines:
+        if line != remove_line + "\n":
+            history.append(line)
+
+    f = open(history_file, "w")
+    for line in history:
+        f.write(line)
+    f.close()
+
+
+# ------------------------------------------------------------------------------
+def get_used():
     """
     Reads the history file and returns a list of all used packages in the
     current shell.
 
-    :return: Nothing.
+    :return: A list of used package names.
     """
 
     # Open the history file
@@ -757,8 +835,405 @@ def used():
     used_pkg_names = list(set(used_pkg_names))
     used_pkg_names.sort()
 
+    return used_pkg_names
+
+
+# ------------------------------------------------------------------------------
+def used():
+    """
+    Reads the history file and returns a list of all used packages in the
+    current shell.
+
+    :return: Nothing.
+    """
+
+    used_pkg_names = get_used()
+
     # Export the shell command to display these items
     export_shell_command('printf "' + r'\n'.join(used_pkg_names) + r'\n' + '"')
+
+
+# ------------------------------------------------------------------------------
+def get_use_pkg_name_from_branch(use_pkg_name, search_paths):
+    """
+    Given a use package name, extracts the branch and uses that to find the most
+    recent use package in the history that is in this same branch.
+
+    :param use_pkg_name: The name of the use package.
+    :param search_paths: A list of paths where the use package might live.
+
+    :return: The name of the most recent use package in the history that matches
+             these branches.
+    """
+
+    # Find the use package file from this use package name
+    use_pkg_file = get_use_pkg_file(use_pkg_name, search_paths)
+
+    # Read this use package file (both delimited and undelimited)
+    use_obj_delim, use_obj_undelim = verify_and_read_use_pkg(use_pkg_file)
+
+    # Extract the various bits of data we need from this config
+    branches = get_branches(use_obj_undelim)
+    branches = [item[0] for item in branches]
+
+    # Open the history file
+    try:
+        use_history_file = os.environ["USE_HISTORY_FILE"]
+    except KeyError:
+        display_error("Unable to locate a use history file")
+        sys.exit(1)
+
+    # Read in the whole file into a single list
+    history = read_history(use_history_file)
+
+    # Step through the list backwards till we find the last used package that
+    # matches any one of the branches
+    for history_item in reversed(range(len(history))):
+        history_branches = history[history_item]["branches"]
+        history_branches = [item[0] for item in history_branches]
+        for history_branch in history_branches:
+            if history_branch in branches:
+                use_pkg_name = history[history_item]["use_package"]
+                export_shell_command(use_pkg_name)
+                return
+    export_shell_command("")
+
+
+# ------------------------------------------------------------------------------
+def unuse_aliases(aliases, old_aliases, raw_aliases):
+    """
+    Undoes the aliases defined in aliases. It follows the following logic:
+
+    If the alias does not exist in the current shell, then something has
+    actively removed this alias. We do not want to override this decision, so do
+    nothing.
+
+    If the alias still exists in the current shell but is different than the
+    value set by the use package, then something has actively changed it since
+    we ran the use command. We do not want to override this decision, so do
+    nothing.
+
+    If the alias still exists in the current shell but is the same as the
+    value set by the use package, then nothing has actively changed it since
+    we ran the use command. We should then consider the following two options:
+
+    If the alias did not exist prior to us running the use package, we should
+    unset this alias so that it no longer exists.
+
+    If the alias did exist prior to us running the use package, then we should
+    reset this alias to that value.
+
+    :param aliases: A list of key/value tuples of the aliases set by the use
+           package.
+    :param old_aliases: A list of key/value tuples of the aliases that were
+           in place when the use package was invoked.
+    :param raw_aliases: The stdIn that contains the aliases as they exist in the
+           current shell.
+
+    :return: A string of semi-colon separated commands to either reset or
+             unset the aliases that were set by the use command.
+    """
+
+    output = ""
+
+    # Format the existing aliases into key/value tuples
+    existing_aliases = format_existing_aliases(raw_aliases)
+
+    # Step through each of the aliases that were set by the use package we are
+    # now un-using.
+    for alias in aliases:
+
+        # Find the matching alias in the current aliases (if it exists)
+        existing_alias = tuple()
+        for item in existing_aliases:
+            if alias[0] == item[0]:
+                existing_alias = item
+                break
+
+        # Find the matching alias in the aliases that existed prior to the use
+        # package changing it.
+        old_alias = tuple()
+        for item in old_aliases:
+            if alias[0] == item[0]:
+                old_alias = item
+                break
+
+        # If the alias does not exist in the current shell, do nothing.
+        if not existing_alias:
+            continue
+
+        # If the alias still exists in the current shell and is different from
+        # what was set by the use package, do nothing.
+        if existing_alias != () and alias[1] != existing_alias[1]:
+            continue
+
+        # If we get here, then the alias exists in the current shell and is
+        # identical to the value set by the use package.
+
+        # If the alias does not exist in the old_aliases, unset the alias.
+        if not old_alias:
+            output += "unset " + alias[0] + ";"
+            continue
+
+        # If the alias does exist in the old_aliases, reset the alias to that
+        # value.
+        output += "alias " + alias[0] + "='" + old_alias[1] + "';"
+
+    # remove any doubled up semi-colons, and remove trailing colons
+    while ";;" in output:
+        output = output.replace(";;", ";")
+    output = output.rstrip(";")
+
+    return output
+
+
+# ------------------------------------------------------------------------------
+def unuse_env_vars(env_vars, old_env_vars):
+    """
+    Undoes the env_vars defined in env_vars. It follows the following logic:
+
+    If the env var does not exist in the current shell, then something has
+    actively removed this var. We do not want to override this decision, so do
+    nothing.
+
+    If the env var still exists in the current shell but is different than the
+    value set by the use package, then something has actively changed it since
+    we ran the use command. We do not want to override this decision, so do
+    nothing.
+
+    If the env var still exists in the current shell but is the same as the
+    value set by the use package, then nothing has actively changed it since
+    we ran the use command. We should then consider the following two options:
+
+    If the env var did not exist prior to us running the use package, we should
+    delete this env var so that it no longer exists.
+
+    If the env var did exist prior to us running the use package, then we should
+    reset this env var to that value.
+
+    :param env_vars: A list of key/value tuples of the env vars set by the use
+           package.
+    :param old_env_vars: A list of key/value tuples of the env vars that were
+           in place when the use package was invoked.
+
+    :return: A string of semi-colon separated commands to either reset or
+             delete the env vars that were set by the use command.
+    """
+
+    output = ""
+
+    # Step through each of the aliases that were set by the use package we are
+    # now un-using.
+    for env_var in env_vars:
+
+        # Find the matching env_var in the current env vars (if it exists)
+        existing_env_var = tuple()
+        for item in os.environ.keys():
+            if env_var[0] == item:
+                existing_env_var = (item, os.environ[item])
+                break
+
+        # Find the matching env_var in the aliases that existed prior to the use
+        # package changing it.
+        old_env_var = tuple()
+        for item in old_env_vars:
+            if env_var[0] == item[0]:
+                old_env_var = item
+                break
+
+        # If the env_var does not exist in the current shell, do nothing.
+        if not existing_env_var:
+            continue
+
+        # If the env_var still exists in the current shell and is different from
+        # what was set by the use package, do nothing.
+        if existing_env_var != () and env_var[1] != existing_env_var[1]:
+            continue
+
+        # If we get here, then the env_var exists in the current shell and is
+        # identical to the value set by the use package.
+
+        # If the env_var does not exist in the old_aliases, delete the env_var.
+        if not old_env_var:
+            output += "unset " + env_var[0] + ";"
+            continue
+
+        # If the env_var does exist in the old_env_vars, reset the env_var to
+        # that value.
+        output += "export " + env_var[0] + "=" + old_env_var[1] + ";"
+
+    # remove any doubled up semi-colons, and remove trailing colons
+    while ";;" in output:
+        output = output.replace(";;", ";")
+    output = output.rstrip(";")
+
+    return output
+
+
+# ------------------------------------------------------------------------------
+def unuse_path(path_prepends, path_postpends, old_path, history):
+    """
+    Removes any additions to the path that may have been created by the use
+    command. The basic rules are as follows:
+
+    First check to see if the path_prepend and path_postpend already existed
+    before the use command was run. If so, don't do anything.
+
+    Look through the remaining history and see if any other use commands have
+    added any of the same path_prepends or path_postpends. If they have not,
+    then feel free to remove these from the current path, but only if they also
+    did not exist in the old_path.
+
+    :param path_prepends: The list of path_prepends set by the use package
+    :param path_postpends: The list of path_postpends set by the use package
+    :param old_path: The string containing the PATH prior to the use package
+    :param history: The history of use commands since the use package
+
+    :return: A string containing the bash command that sets the PATH variable.
+    """
+
+    try:
+        existing_paths = os.environ["PATH"].split(":")
+    except KeyError:
+        display_error("$PATH does not exist as an environmental variable.")
+        sys.exit(1)
+
+    # Convert the old path into a list.
+    old_path = old_path.split(":")
+
+    # Build a list of subsequent path_prepends and path_postpends.
+    subsequent_history_paths = list()
+    for history_item in history:
+        subsequent_history_paths.append(history_item["new_path_prepends"])
+        subsequent_history_paths.append(history_item["new_path_postpends"])
+
+    # Build a list of paths to remove.
+    paths_to_remove = list()
+
+    # Process each path in path_prepends
+    for path in path_prepends:
+
+        path = path[0]
+
+        # If path is blank, do nothing
+        if path == "":
+            continue
+
+        # Do not remove any paths that were in the path prior to use.
+        if path in old_path:
+            continue
+
+        # Do not remove any paths that were in the subsequent use packages.
+        if path in subsequent_history_paths:
+            continue
+
+        # If we get this far, add this path to the list to be extracted.
+        paths_to_remove.append(path)
+
+    # Process each path in path_postpends
+    for path in path_postpends:
+
+        path = path[0]
+
+        # If path is blank, do nothing
+        if path == "":
+            continue
+
+        # Do not remove any paths that were in the path prior to use.
+        if path in old_path:
+            continue
+
+        # Do not remove any paths that were in the subsequent use packages.
+        if path in subsequent_history_paths:
+            continue
+
+        # If we get this far, add this path to the list to be extracted.
+        paths_to_remove.append(path)
+
+    # Remove the paths
+    for path_to_remove in paths_to_remove:
+        existing_paths.remove(path_to_remove)
+
+    # Create the bash command
+    return "export PATH=" + ":".join(existing_paths).rstrip(":")
+
+
+# ------------------------------------------------------------------------------
+def unuse_unuse_cmds(cmds):
+    """
+    Runs the free-form unuse commands from the use package.
+
+    :param cmds: The free-form commands in the use package "cmds" section.
+
+    :return: A series of bash formatted commands separated by semi-colons.
+    """
+
+    output = ""
+    for cmd in cmds:
+        output += cmd[0] + "';"
+
+    return output.rstrip(";")
+
+
+# ------------------------------------------------------------------------------
+def unuse(use_pkg_name, raw_aliases):
+    """
+    Given a use_pkg_name this will find the most recent version in the history
+    file and try to undo whatever that use command did (but being aware not to
+    step on any similar commands that have been run since that time).
+
+    :param use_pkg_name: The name of the use package we are un-using.
+    :param raw_aliases: The list of raw alias strings.
+
+    :return: Nothing.
+    """
+
+    # Open the history file
+    try:
+        use_history_file = os.environ["USE_HISTORY_FILE"]
+    except KeyError:
+        display_error("Unable to locate a use history file")
+        sys.exit(1)
+
+    # Read in the whole file into a single list
+    history = read_history(use_history_file)
+
+    # Step through the list backwards till we find the last used package
+    unuse_pkg = None
+    for history_item in reversed(range(len(history))):
+        if history[history_item]["use_package"] == use_pkg_name:
+            unuse_pkg = history[history_item]
+            history = history[history_item+1:]
+            break
+
+    if unuse_pkg is None:
+        return
+
+    # Load in the changes made by this use package
+    aliases = unuse_pkg["new_aliases"]
+    env_vars = unuse_pkg["new_env_vars"]
+    path_prepends = unuse_pkg["new_path_prepends"]
+    path_postpends = unuse_pkg["new_path_postpends"]
+    existing_aliases = unuse_pkg["existing_aliases"]
+    existing_env_vars = unuse_pkg["existing_env_vars"]
+    existing_path = unuse_pkg["existing_path"]
+    cmds = unuse_pkg["unuse"]
+
+    # Try to undo the aliases, env_vars, and path.
+    unuse_aliases_cmd = unuse_aliases(aliases, existing_aliases, raw_aliases)
+    unuse_aliases_cmd += ";"
+    unuse_aliases_cmd += unuse_env_vars(env_vars, existing_env_vars)
+    unuse_aliases_cmd += ";"
+    unuse_aliases_cmd += unuse_path(path_prepends, path_postpends,
+                                    existing_path, history)
+    unuse_aliases_cmd += ";"
+    unuse_aliases_cmd += unuse_unuse_cmds(cmds)
+
+    # Remove this line from the use history
+    remove_history(use_history_file, str(unuse_pkg))
+
+    # Export the shell command to display these items
+    export_shell_command(str(unuse_aliases_cmd).rstrip(";"))
 
 
 # ------------------------------------------------------------------------------
@@ -813,7 +1288,6 @@ def setup():
 if __name__ == "__main__":
 
     # Make sure this script is owned by root and only writable by root.
-    # TODO: Wrap this to check for assertion error
     if not validate_permissions(os.path.abspath(__file__), LEGAL_PERMISSIONS):
         handle_permission_violation(os.path.abspath(__file__))
 
@@ -841,12 +1315,21 @@ if __name__ == "__main__":
         use_pkg_search_paths = [env_use_pkg_path]
 
     # ===========================
-    if sys.argv[1] == "complete":
-        complete(sys.argv[2], use_pkg_search_paths)
+    if sys.argv[1] == "complete_use":
+        complete_use(sys.argv[2], use_pkg_search_paths)
+
+    # ===========================
+    if sys.argv[1] == "complete_unuse":
+        complete_unuse(sys.argv[2])
+
+    # ===========================
+    if sys.argv[1] == "package_from_branch":
+        get_use_pkg_name_from_branch(sys.argv[2], use_pkg_search_paths)
 
     # ===========================
     if sys.argv[1] == "use":
-        use(sys.argv[2], use_pkg_search_paths, sys.stdin)
+        stdin = list(sys.stdin)
+        use(sys.argv[2], use_pkg_search_paths, stdin)
 
     # ===========================
     if sys.argv[1] == "used":
@@ -854,4 +1337,6 @@ if __name__ == "__main__":
 
     # ===========================
     if sys.argv[1] == "unuse":
-        pass
+        stdin = list(sys.stdin)
+        if len(sys.argv) > 2:
+            unuse(sys.argv[2], stdin)
