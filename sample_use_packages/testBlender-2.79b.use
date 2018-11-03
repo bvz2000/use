@@ -19,3 +19,6 @@ BLENDER_OTHER_HOME=/this/that
 [cmds]
 ls -al
 alias test3='ls -l'
+
+[unuse]
+ls -al
