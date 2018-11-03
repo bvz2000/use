@@ -20,7 +20,7 @@ python_script="`dirname $me`/use.py"
 # ==============================================================================
 
 # If this is a setup, (ha! joke!) then get a path to the history file and also
-# define the tab complete function.
+# define the tab complete_use function.
 if [ "$1" == "setup" ]; then
 
     # Run the python setup
@@ -28,25 +28,18 @@ if [ "$1" == "setup" ]; then
 
     # Function to set up tab completion for the use command
     _use () {
-        local files=`$python_script complete "${COMP_WORDS[$COMP_CWORD]}"`
+        local files=`$python_script complete_use "${COMP_WORDS[$COMP_CWORD]}"`
         COMPREPLY=( ${files[@]} )
     }
 
-#    # Function to set up tab completion for the unuse command
-#    _unuse () {
-#        local word="${COMP_WORDS[$COMP_CWORD]}"
-#        local usedScripts=( `source $BASH_SOURCE used` )
-#        local output=()
-#        for item in "${usedScripts[@]}"; do
-#            if [[ $item =~ ^$word.* ]] || [ "$word" == "" ]; then
-#                output+=("$item")
-#            fi
-#        done
-#        COMPREPLY=( ${output[@]} )
-#    }
+    # Function to set up tab completion for the use command
+    _unuse () {
+        local pkgs=`$python_script complete_unuse "${COMP_WORDS[$COMP_CWORD]}"`
+        COMPREPLY=( ${pkgs[@]} )
+    }
 
     # Call functions to set up tab-completions for use and unuse
-    # complete -F _use use.sh
+    # complete_use -F _use use.sh
     complete -F _use use
     complete -F _unuse unuse
 
@@ -66,8 +59,8 @@ fi
 
 if [ "$1" == "use" ]; then
 
-    # Call the python script for all of the data we need
-    #aliasList=`alias | $python_script processStdIn`
+    unuse_pkg=`$python_script package_from_branch $2`
+    eval `alias | $python_script unuse $unuse_pkg`
     eval `alias | $python_script use $2`
 
 fi
@@ -79,7 +72,17 @@ fi
 
 if [ "$1" == "used" ]; then
 
-    # Call the python script to get a list of used packages
     eval `$python_script used`
+
+fi
+
+
+# ==============================================================================
+# unuse
+# ==============================================================================
+
+if [ "$1" == "unuse" ]; then
+
+    eval `alias | $python_script unuse $2`
 
 fi
