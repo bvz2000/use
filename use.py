@@ -972,7 +972,7 @@ def unuse_aliases(aliases, old_aliases, raw_aliases):
 
         # If the alias does not exist in the old_aliases, unset the alias.
         if not old_alias:
-            output += "unset " + alias[0] + ";"
+            output += "unalias " + alias[0] + ";"
             continue
 
         # If the alias does exist in the old_aliases, reset the alias to that
