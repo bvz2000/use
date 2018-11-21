@@ -21,7 +21,7 @@ LEGAL_COMMANDS = [
 LEGAL_PERMISSIONS = [644, 744, 754, 755, 654, 655, 645]
 ENFORCE_PERMISSIONS = False
 DISPLAY_PERMISSIONS_VIOLATIONS = False
-DEFAULT_USE_PKG_PATHS = ["/opt/use", "/home/bvz/Documents/dev/use/"]
+DEFAULT_USE_PKG_PATHS = ["/opt/use", os.path.expanduser("/Documents/dev/use/")]
 
 
 # ------------------------------------------------------------------------------
@@ -134,10 +134,11 @@ def list_all_use_pkg_files(search_paths):
 
     use_pkg_files = list()
     for searchPath in search_paths:
-        file_names = os.listdir(searchPath)
-        for fileName in file_names:
-            if fileName.endswith(".use"):
-                use_pkg_files.append(fileName)
+        if os.path.exists(searchPath) and os.path.isdir(searchPath):
+            file_names = os.listdir(searchPath)
+            for fileName in file_names:
+                if fileName.endswith(".use"):
+                    use_pkg_files.append(fileName)
     return list(set(use_pkg_files))
 
 
