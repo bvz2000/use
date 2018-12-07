@@ -48,6 +48,7 @@ if [ "$1" == "setup" ]; then
     alias unuse="source $me unuse"
     alias used="source $me used"
     alias useconfig="$me config"
+    alias useupdate="source $me update"
 
     return 0
 
@@ -84,5 +85,22 @@ fi
 if [ "$1" == "unuse" ]; then
 
     eval `alias | $python_script unuse $2`
+
+fi
+
+
+# ==============================================================================
+# update-latest
+# ==============================================================================
+
+if [ "$1" == "update" ]; then
+
+    if [[ $EUID -ne 0 ]]; then
+       echo "This script must be run as root. Note: Running with sudo will"
+       echo "NOT work! You have to become root using 'su' and then re-run this"
+       echo "command."
+    else
+        eval `alias | $python_script update_latest`
+    fi
 
 fi

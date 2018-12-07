@@ -17,6 +17,7 @@ LEGAL_COMMANDS = [
     "use",
     "used",
     "which",
+    "update_latest",
 ]
 LEGAL_PERMISSIONS = [644, 744, 754, 755, 654, 655, 645]
 ENFORCE_PERMISSIONS = False
@@ -1284,6 +1285,65 @@ def setup():
     export_shell_command(output)
 
 
+# ------------------------------------------------------------------------------
+def update_latest(search_paths):
+    """
+    Goes through the use package directory and makes sure that every file has
+    a latest. For example, if there are two files:
+
+    blender-2.79.use and blender-2.80.use
+
+    this function will find the newest of the two and create a symlink called
+    blender-latest.use that points to the newest (presumably blender-2.80.use,
+    though it is based on file modification date, not name).
+
+    :return: Nothing.
+    """
+
+    use_pkgs = list()
+    for search_path in search_paths:
+        if not os.path.exists(search_path) or not os.path.isdir(search_path):
+            continue
+
+        items = os.listdir(search_path)
+        for item in items:
+            if item.endswith(".use"):
+                if not os.path.isdir(item):
+                    if not os.path.islink(item):
+                        use_pkgs.append(item)
+
+        if not use_pkgs:
+            continue
+
+        use_prefixes = dict()
+        for use_pkg in use_pkgs:
+            prefix = use_pkg.split("-")[0]
+            if prefix not in use_prefixes.keys():
+                use_prefixes[prefix] = [use_pkg]
+            else:
+                use_prefixes[prefix].append(use_pkg)
+
+        for prefix in use_prefixes.keys():
+
+            # Find the most recently modified use package for each prefix
+            latest = use_prefixes[list(use_prefixes.keys())[0]]
+            max_time = 0
+            for item in use_prefixes[prefix]:
+                mod_date = os.path.getmtime(os.path.join(search_path, item))
+                if mod_date > max_time:
+                    latest = os.path.join(search_path, item)
+                    max_time = mod_date
+
+            # Get rid of the existing symlink if needed
+            link = str(prefix) + "-latest.use"
+            if os.path.exists(os.path.join(search_path, link)):
+                os.unlink(os.path.join(search_path, link))
+
+            # Make a symlink
+            os.symlink(latest,
+                       os.path.join(search_path, str(prefix) + "-latest.use"))
+
+
 # ==============================================================================
 # ==============================================================================
 if __name__ == "__main__":
@@ -1316,6 +1376,10 @@ if __name__ == "__main__":
         use_pkg_search_paths = [env_use_pkg_path]
 
     # ===========================
+    if sys.argv[1] == "update_latest":
+        update_latest(use_pkg_search_paths)
+
+    # ===========================
     if sys.argv[1] == "complete_use":
         complete_use(sys.argv[2], use_pkg_search_paths)
 
@@ -1325,10 +1389,16 @@ if __name__ == "__main__":
 
     # ===========================
     if sys.argv[1] == "package_from_branch":
+        if len(sys.argv) != 3:
+            display_error("package_from_branch: Wrong number of arguments.")
+            sys.exit(1)
         get_use_pkg_name_from_branch(sys.argv[2], use_pkg_search_paths)
 
     # ===========================
     if sys.argv[1] == "use":
+        if len(sys.argv) != 3:
+            display_error("use: Wrong number of arguments.")
+            sys.exit(1)
         stdin = list(sys.stdin)
         use(sys.argv[2], use_pkg_search_paths, stdin)
 
