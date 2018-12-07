@@ -1,3 +1,39 @@
+# This is a sample use file. Note that this is more complex than a normal use
+# file in that it has multiple alias' and multiple env vars. This is just done
+# to show that this is possible.
+
+# The "branch" is always a single item, and is usually the name of the app
+# itself. It is used so that unuse commands can go through the history of used
+# items in the current shell and unuse any previous items in the same "branch"
+# Essentially this means any new "use blender-<whatever>" commands will be able
+# to identify any previous versions of the same type and undo what they had
+# done before using the new version.
+
+# Alias just sets up any alias' for the current shell. There may be as many as
+# desired.
+
+# Env defines env variables for the current shell. There may be as many as
+# desired.
+
+# Path-prepend is a series of paths to prepend to the shell PATH variable. There
+# may be as many as desired.
+
+# Path-postpend is the same, but these paths will be appended to the end of the
+# PATH variable.
+
+# Cmds is simply any shell commands to be run. This may be as complex a set of
+# shell instructions as desired. Note, these are not stored in the use history
+# in any way that allows them to be "unused" automatically.  So be careful when
+# choosing to implement any functionality with these commands. Note, since the
+# use command is sourced, these shell commands will run in the same session as
+# the one the user is calling the use package from.
+
+# Unuse is, like cmds, simply a list of shell commands to be run when the unuse
+# command is used. Most likely to be used to undo any commands issued by the
+# cmds section described previously.Note, since the use command is sourced,
+# these shell commands will run in the same session as the one the user is
+# calling the use package from.
+
 [branch]
 blender
 
@@ -11,6 +47,7 @@ BLENDER_OTHER_HOME=/this/that
 
 [path-prepend]
 /opt/apps/blender/blender/2.79/
+/here/is/another/path/
 
 [path-postpend]
 /POSTPEND1/
