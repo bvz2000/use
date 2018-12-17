@@ -17,7 +17,8 @@ LEGAL_COMMANDS = [
     "use",
     "used",
     "which",
-    "update_latest",
+    "symlink_latest",
+    "update_desktop",
 ]
 LEGAL_PERMISSIONS = [644, 744, 754, 755, 654, 655, 645]
 ENFORCE_PERMISSIONS = False
@@ -1286,7 +1287,7 @@ def setup():
 
 
 # ------------------------------------------------------------------------------
-def update_latest(search_paths):
+def symlink_latest(search_paths):
     """
     Goes through the use package directory and makes sure that every file has
     a latest. For example, if there are two files:
@@ -1344,6 +1345,75 @@ def update_latest(search_paths):
                        os.path.join(search_path, str(prefix) + "-latest.use"))
 
 
+# ------------------------------------------------------------------------------
+def update_desktops(search_paths, current_only=True):
+    """
+    Goes through the use packages and finds the .desktop files referenced by
+    these files and makes alias' to them in /usr/share/applications.
+
+    :param search_paths: Where the use packages live.
+    :param current_only: If true, then only the "current" use packages will be
+           querried (i.e. use packages where the version is "current")
+
+    :return: Nothing.
+    """
+
+    apps_p = "/usr/share/applications"
+    use_pkgs = dict()
+    for search_path in search_paths:
+        if not os.path.exists(search_path) or not os.path.isdir(search_path):
+            continue
+
+        items = os.listdir(search_path)
+        for item in items:
+            if item.endswith(".use"):
+                if not os.path.isdir(item):
+                    if not os.path.islink(item):
+                        use_pkgs[item] = os.path.join(search_path, item)
+
+        if not use_pkgs:
+            continue
+
+    for use_pkg in use_pkgs:
+
+        if current_only and "-current." not in use_pkg:
+            continue
+
+        # Read in the use package as a configparser
+        config_obj = configparser.ConfigParser(allow_no_value=True)
+        config_obj.read(use_pkgs[use_pkg])
+
+        # If it has a desktop section, read in all of the items
+        if config_obj.has_section("desktop"):
+            items = config_obj.items("desktop")
+
+            # For each of the items, create a symlink
+            for item in items:
+
+                # If this particular item is not a desktop item, move on
+                if not item[0].startswith("desktop"):
+                    continue
+
+                # Get the path to the desktop file, its name, and where on the
+                # system it should be living
+                desktop_p = item[1]
+                desktop_n = os.path.split(desktop_p)[1]
+                app_desktop_p = os.path.join(apps_p, desktop_n)
+
+                # If the desktop file does not exist or is a dir, move on
+                if not os.path.exists(desktop_p) or os.path.isdir(desktop_p):
+                    continue
+
+                # If there is already a file in the official location, remove it
+                if os.path.exists(app_desktop_p):
+                    print("Removing", app_desktop_p)
+                    os.remove(app_desktop_p)
+
+                # Make a symlink to this desktop file in the official location
+                print(desktop_p, "-->", app_desktop_p)
+                os.symlink(desktop_p, app_desktop_p)
+
+
 # ==============================================================================
 # ==============================================================================
 if __name__ == "__main__":
@@ -1356,6 +1426,7 @@ if __name__ == "__main__":
     if sys.argv[1] not in LEGAL_COMMANDS:
         display_error("Unknown command.")
         display_usage()
+        sys.exit(1)
 
     # SETUP
     # ===========================
@@ -1367,17 +1438,26 @@ if __name__ == "__main__":
     try:
         env_use_pkg_path = os.environ["USE_PKG_PATH"]
     except KeyError:
-        display_error("Missing USE_PKG_PATH env variable (where use packages "
-                      "live). Exiting.")
-        sys.exit(1)
+        try:
+            env_use_pkg_path = sys.argv[2]
+        except IndexError:
+            display_error("Missing USE_PKG_PATH env variable (where use "
+                          "packages live), and no use package path was "
+                          "provided as an argument. Exiting.")
+            sys.exit(1)
+
     if ":" in env_use_pkg_path:
         use_pkg_search_paths = env_use_pkg_path.split(":")
     else:
         use_pkg_search_paths = [env_use_pkg_path]
 
     # ===========================
-    if sys.argv[1] == "update_latest":
-        update_latest(use_pkg_search_paths)
+    if sys.argv[1] == "symlink_latest":
+        symlink_latest(use_pkg_search_paths)
+
+    # ===========================
+    if sys.argv[1] == "update_desktop":
+        update_desktops(use_pkg_search_paths)
 
     # ===========================
     if sys.argv[1] == "complete_use":
