@@ -13,6 +13,7 @@ LEGAL_COMMANDS = [
     "config",
     "package_from_branch",
     "setup",
+    "refresh",
     "unuse",
     "use",
     "used",
@@ -23,7 +24,11 @@ LEGAL_COMMANDS = [
 LEGAL_PERMISSIONS = [644, 744, 754, 755, 654, 655, 645]
 ENFORCE_PERMISSIONS = False
 DISPLAY_PERMISSIONS_VIOLATIONS = False
-DEFAULT_USE_PKG_PATHS = ["/opt/use", os.path.expanduser("/Documents/dev/use/")]
+DEFAULT_USE_PKG_PATHS = ["/opt/apps/",
+                         "/opt/use",
+                         os.path.expanduser("/Documents/dev/use/")]
+RECURSIVE = True
+SPEEDY = True
 
 
 # ------------------------------------------------------------------------------
@@ -124,23 +129,81 @@ def handle_permission_violation(file_name):
         sys.exit(1)
 
 
+# TODO: This repeats some of the code from list_all_use_pkg_files
 # ------------------------------------------------------------------------------
-def list_all_use_pkg_files(search_paths):
+def write_use_pkg_files_to_env(search_paths, recursive=RECURSIVE):
+    """
+    Finds all of the use packages and writes their names to an env var called
+    "AVAILABLE_USE_PACKAGES" in the format:
+
+    name1;path1:name2;path2:...:nameN;pathN
+
+
+    :param search_paths: A list of paths where the use packages could live.
+    :param recursive: If true, then all sub-dirs of the search paths will be
+           traversed as well.
+
+    :return: A string that is the bash shell command to create the env var.
+    """
+
+    use_pkg_files = list()
+    for search_path in search_paths:
+        if os.path.exists(search_path) and os.path.isdir(search_path):
+            if recursive:
+                for dir_n, dirs_n, files_n in os.walk(search_path):
+                    for file_n in files_n:
+                        if file_n.endswith(".use"):
+                            full_p = os.path.join(dir_n, file_n)
+                            use_pkg_files.append(file_n + "@" + full_p)
+            else:
+                files_n = os.listdir(search_path)
+                for file_n in files_n:
+                    if file_n.endswith(".use"):
+                        full_p = os.path.join(search_path, file_n)
+                        use_pkg_files.append(file_n + "@" + full_p)
+
+    output = ":".join(use_pkg_files)
+    return "export AVAILABLE_USE_PACKAGES=" + output
+
+
+# ------------------------------------------------------------------------------
+def list_all_use_pkg_files(search_paths, speedy=SPEEDY, recursive=RECURSIVE):
     """
     Returns a list of all use packages anywhere in the passed search_paths.
 
     :param search_paths: A list of paths where the use packages could live.
+    :param speedy: If True, then instead of searching the disk, it will just
+           return what it stored in the env.
+    :param recursive: If true, then all sub-dirs of the search paths will be
+           traversed as well.
 
     :return: A list of use package names (de-duplicated)
     """
 
     use_pkg_files = list()
-    for searchPath in search_paths:
-        if os.path.exists(searchPath) and os.path.isdir(searchPath):
-            file_names = os.listdir(searchPath)
-            for fileName in file_names:
-                if fileName.endswith(".use"):
-                    use_pkg_files.append(fileName)
+    if speedy:
+        try:
+            env = os.environ["AVAILABLE_USE_PACKAGES"]
+            env = env.split(":")
+            for item in env:
+                use_pkg_files.append(item.split("@")[0])
+        except KeyError:
+            speedy = False
+
+    if not speedy:
+        for searchPath in search_paths:
+            if os.path.exists(searchPath) and os.path.isdir(searchPath):
+                if recursive:
+                    for dir_n, dirs_n, files_n in os.walk(searchPath):
+                        for file_n in files_n:
+                            if file_n.endswith(".use"):
+                                use_pkg_files.append(file_n)
+                else:
+                    files_n = os.listdir(searchPath)
+                    for file_n in files_n:
+                        if file_n.endswith(".use"):
+                            use_pkg_files.append(file_n)
+
     return list(set(use_pkg_files))
 
 
@@ -198,8 +261,10 @@ def complete_unuse(stub):
     export_shell_command("\n".join(outputs))
 
 
+# TODO: This searches the disk again... duplicate code
 # ------------------------------------------------------------------------------
-def list_matching_use_pkg_files(use_pkg_name, search_paths):
+def list_matching_use_pkg_files(use_pkg_name, search_paths, speedy=SPEEDY,
+                                recursive=RECURSIVE):
     """
     Given a use_pkg_name, tries to find matching "use_pkg_name.use" files
     in search_paths. Returns a list of full paths to these files, resolving any
@@ -209,16 +274,37 @@ def list_matching_use_pkg_files(use_pkg_name, search_paths):
     :param use_pkg_name: The base name of the use package. I.e. "clarisse"
            if you were looking for "clarisse-3.6sp5.use"
     :param search_paths: A list of paths where the use packages could live.
+    :param speedy: If True, then instead of searching the disk, it will just
+           return what it stored in the env.
+    :param recursive: If True, then all sub-directories of the search paths will
+           searched as well.
 
     :return: A list of full paths to (resolved) use package files that match
              this name. Empty if no matches.
     """
 
     use_pkg_files = list()
-    for search_path in search_paths:
-        use_pkg = os.path.join(search_path, use_pkg_name + ".use")
-        if os.path.exists(use_pkg):
-            use_pkg_files.append(os.path.realpath(use_pkg))
+    if speedy:
+        try:
+            env = os.environ["AVAILABLE_USE_PACKAGES"]
+            env = env.split(":")
+            for item in env:
+                if item.endswith(os.path.sep + use_pkg_name + ".use"):
+                    use_pkg_files.append(item.split("@")[1])
+        except KeyError:
+            speedy = False
+
+    if not speedy:
+        for search_path in search_paths:
+            if recursive:
+                for dir_n, dirs_n, files_n in os.walk(search_path):
+                    use_pkg = os.path.join(dir_n, use_pkg_name + ".use")
+                    if os.path.exists(use_pkg):
+                        use_pkg_files.append(use_pkg)
+            else:
+                use_pkg = os.path.join(search_path, use_pkg_name + ".use")
+                if os.path.exists(use_pkg):
+                    use_pkg_files.append(os.path.realpath(use_pkg))
 
     return use_pkg_files
 
@@ -1282,6 +1368,45 @@ def setup():
     # Store the use package paths
     output += ";export USE_PKG_PATH=" + ":".join(use_pkg_paths)
 
+    # Save the existing use packages to an env var
+    output += ";" + write_use_pkg_files_to_env(use_pkg_paths)
+
+    # Export these env variables.
+    export_shell_command(output)
+
+
+# TODO: This repeats some of the code from setup
+# ------------------------------------------------------------------------------
+def refresh():
+    """
+    Reloads the list of use packages into the shell env variable.
+
+    :return:
+    """
+
+    # Read in the existing USE_PKG_PATH
+    try:
+        use_pkg_path = os.environ["USE_PKG_PATH"]
+    except KeyError:
+        display_error("You must run setup first.")
+        sys.exit(1)
+
+    # Convert it into a list
+    use_pkg_paths = use_pkg_path.split(":")
+
+    legal_path_found = False
+    for path in use_pkg_paths:
+        if os.path.exists(path) and os.path.isdir(path):
+            legal_path_found = True
+
+    if not legal_path_found:
+        display_error("No use package directory found. I looked for:",
+                      ":".join(use_pkg_paths))
+        sys.exit(1)
+
+    # Save the existing use packages to an env var
+    output = write_use_pkg_files_to_env(use_pkg_paths)
+
     # Export these env variables.
     export_shell_command(output)
 
@@ -1450,6 +1575,11 @@ if __name__ == "__main__":
         use_pkg_search_paths = env_use_pkg_path.split(":")
     else:
         use_pkg_search_paths = [env_use_pkg_path]
+
+    # ===========================
+    if sys.argv[1] == "refresh":
+        refresh()
+        sys.exit(0)
 
     # ===========================
     if sys.argv[1] == "symlink_latest":
