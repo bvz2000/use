@@ -1,9 +1,12 @@
 #!/bin/bash
 
-# This script must be SOURCED.
-if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
-    echo "This script must be sourced, not run"
-    exit 1
+# This script must be SOURCED (only for some functions)
+if [ "$1" != "desktop" ]; then
+
+    if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
+        echo "This script must be sourced, not run"
+        exit 1
+    fi
 fi
 
 # Get the path to this shell script
@@ -48,7 +51,8 @@ if [ "$1" == "setup" ]; then
     alias unuse="source $me unuse"
     alias used="source $me used"
     alias useconfig="$me config"
-    alias useupdate="source $me update"
+    alias useSymlinkLatest="source $me update"
+    alias useUpdateDesktops="$me desktop"
 
     return 0
 
@@ -93,14 +97,29 @@ fi
 # update-latest
 # ==============================================================================
 
-if [ "$1" == "update" ]; then
+if [ "$1" == "symlink" ]; then
 
     if [[ $EUID -ne 0 ]]; then
        echo "This script must be run as root. Note: Running with sudo will"
        echo "NOT work! You have to become root using 'su' and then re-run this"
        echo "command."
     else
-        eval `alias | $python_script update_latest`
+        eval `alias | $python_script symlink_latest`
+    fi
+
+fi
+
+
+# ==============================================================================
+# update-desktop
+# ==============================================================================
+
+if [ "$1" == "desktop" ]; then
+
+    if [[ $EUID -ne 0 ]]; then
+       echo "This script must be run as root."
+    else
+        $python_script update_desktop $2
     fi
 
 fi
