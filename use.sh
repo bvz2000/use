@@ -50,6 +50,7 @@ if [ "$1" == "setup" ]; then
     alias use="source $me use"
     alias unuse="source $me unuse"
     alias used="source $me used"
+    alias useRefresh="source $me refresh"
     alias useconfig="$me config"
     alias useSymlinkLatest="source $me update"
     alias useUpdateDesktops="$me desktop"
