@@ -162,6 +162,8 @@ def write_use_pkg_files_to_env(search_paths, recursive=RECURSIVE):
                         full_p = os.path.join(search_path, file_n)
                         use_pkg_files.append(file_n + "@" + full_p)
 
+    use_pkg_files = list(set(use_pkg_files))
+    
     output = ":".join(use_pkg_files)
     return "export AVAILABLE_USE_PACKAGES=" + output
 
