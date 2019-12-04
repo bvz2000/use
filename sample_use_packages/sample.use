@@ -6,17 +6,22 @@
 # The "branch" is always a single item, and is usually the name of the app
 # itself. It is used so that unuse commands can go through the history of used
 # items in the current shell and unuse any previous items in the same "branch"
-# Essentially this means any new "use appname-<whatever>" commands will be able
+# Essentially this means any new "use appname-version" commands will be able
 # to identify any previous versions of the same type and undo what they had
-# done before using the new version.
+# done before using the new version. For example, Blender would probably use
+# "blender" as the branch name, regardless of version.
 
 # [alias]
 # Alias just sets up any alias' for the current shell. There may be as many as
-# desired.
+# desired. Usually this would be an alias that launches the app you are setting
+# up, but it isn't necessary. For example, you can use a use package to control
+# which version of a python library to use. In that case, you probably would not
+# need an alias.
 
 # [env]
 # Env defines env variables for the current shell. There may be as many as
-# desired.
+# desired. If any match variables that already exist, the new value will
+# supersede the previous value.
 
 # [path-prepend-PATH_VAR_NAME]
 # Path-prepend is a series of paths to prepend to the given variable variable.
@@ -31,13 +36,20 @@
 # Path-postpend is the same, but these paths will be appended to the end of each
 # of the variables.
 
+# NOTE: You may have as many [path-prepend-VAR_NAME] and [path-postpend-VAR_NAME]
+# sections as you need. One for each variable.
+
 # [use-scripts]
 # Use-scripts is a series of outside scripts to source when use is invoked.
-# These scripts must be shell scripts as they will be sourced.
+# These scripts must be shell scripts as they will be sourced. For the sake of
+# security, these scripts must be owned by root and may not be writable by
+# anyone outside of root. There may be as many scripts as needed.
 
 # [unuse-scripts]
 # Use-scripts is a series of outside scripts to source when unuse is invoked.
-# These scripts must be shell scripts as they will be sourced.
+# These scripts must be shell scripts as they will be sourced. They have the
+# same permissions requirements as the use scripts. There may be as many scripts
+# as needed.
 
 # The use system also has a few built-in variables that will be expanded
 # automatically. These are values that are set by the use.py app based on
@@ -47,25 +59,35 @@
 #
 # Wherever one of these variables is used in this file, it will be replaced by
 # the value of that variable before the use command is run. The use of these
-# variables is optional. See below for examples of their usage.
+# variables is optional. See below for examples of their usage. Specifically,
+# note how it is used in the alias for blender. But it may be used anywhere in
+# the entire file and will be replaced by the value of the variable before being
+# passed back to the shell.
 
 [branch]
-clarisse
+blender
 
 [env]
-CLARISSE_HOME=/opt/apps/isotropix/clarisse
+SOME_BLENDER_RELATED_ENV_VAR=some_value
+SOME_OTHER_VAR=some_other_value
 
 [alias]
-clarisse=/opt/apps/isotropix/clarisse/$VERSION/wrapper/clarisse.sh
+blender=/opt/apps/blender/blender/$VERSION/wrapper/blender.sh
+bl=/opt/apps/blender/blender/$VERSION/wrapper/blender.sh
+random=ls -al
 
 [desktop]
 desktop=/opt/apps/isotropix/clarisse/$VERSION/wrapper/clarisse.desktop
 
 [path-prepend-IX_SHELF_CONFIG_FILE]
+/some/path/that/I/want/to/prepend/to/the/IX_SHELF_CONFIG_FILE/var
+/This/is/a/second/path/to/prepend/to/this/var
 
 [path-postpend-IX_SHELF_CONFIG_FILE]
 /opt/apps/isotropix/clarisse/$VERSION/app/shelves/shelf.cfg
 
 [use-scripts]
+/some/script/to/run/when/use/is/invoked.sh
 
 [unuse-scripts]
+/some/script/to/run/when/unuse/is/invoked.sh
