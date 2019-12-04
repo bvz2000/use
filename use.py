@@ -29,11 +29,11 @@ LEGAL_PERMISSIONS = [644, 744, 754, 755, 654, 655, 645]
 
 # Whether to enforce these permissions. Should almost always be set to True
 # unless the system is under development.
-ENFORCE_PERMISSIONS = False
+ENFORCE_PERMISSIONS = True
 
 # Show errors for use packages that do not meet the permissions requirements, or
 # simply ignore them silently.
-DISPLAY_PERMISSIONS_VIOLATIONS = False
+DISPLAY_PERMISSIONS_VIOLATIONS = True
 
 # Automatically handle use package version numbers. This way, a use package
 # named "clarisse.use" will be presented to the user as "clarisse-3.6sp7" based
@@ -923,14 +923,15 @@ def format_cmds_for_shell(cmds, variables):
              package file.
     """
 
-    output = ""
+    output = list()
+
     for cmd in cmds:
-        output += cmd[1] + ";"
+        cmd = cmd[0]
+        for key in variables.keys():
+            cmd = cmd.replace("$" + key, variables[key])
+        output.append(cmd)
 
-    for key in variables.keys():
-        output = output.replace("$" + key, variables[key])
-
-    return output.strip(";")
+    return ";".join(output)
 
 
 # ------------------------------------------------------------------------------
@@ -1199,6 +1200,42 @@ def use(use_pkg_name, raw_aliases):
     while ";;" in bash_cmd:
         bash_cmd = bash_cmd.replace(";;", ";")
     bash_cmd = bash_cmd.strip(";")
+
+    # Verify that the use scripts exist
+    for use_script in use_scripts:
+        use_script = use_script[0]
+        if not os.path.exists(use_script):
+            msg = "use script: " + use_script + " does not exist. Exiting."
+            display_error(msg)
+            sys.exit(1)
+
+    # Verify that the unuse scripts exist
+    for unuse_script in unuse_scripts:
+        unuse_script = unuse_script[0]
+        if not os.path.exists(unuse_script):
+            msg = "unuse script: " + unuse_script + " does not exist. Exiting."
+            display_error(msg)
+            sys.exit(1)
+
+    # Verify the use scripts and unuse scripts have the correct permissions
+    if ENFORCE_PERMISSIONS:
+        for use_script in use_scripts:
+            use_script = use_script[0]
+            if not validate_permissions(use_script, LEGAL_PERMISSIONS):
+                if DISPLAY_PERMISSIONS_VIOLATIONS:
+                    msg = "Script: " + use_script + " must be owned by root"
+                    msg += "and only writable by root."
+                    display_error(msg)
+                sys.exit(1)
+
+        for unuse_script in unuse_scripts:
+            unuse_script = unuse_script[0]
+            if not validate_permissions(unuse_script, LEGAL_PERMISSIONS):
+                if DISPLAY_PERMISSIONS_VIOLATIONS:
+                    msg = "Script: " + unuse_script + " must be owned by root"
+                    msg += "and only writable by root."
+                    display_error(msg)
+                sys.exit(1)
 
     # Next we will have to build the history info. This is basically a list of
     # what we changed, and what its previous value was so that we can
@@ -1622,6 +1659,20 @@ def unuse(use_pkg_name,
     unuse_scripts = hist_obj.get(branch, "unuse_scripts")
     unuse_scripts = ast.literal_eval(unuse_scripts)
     if unuse_scripts:
+
+        for i in range(len(unuse_scripts)):
+            unuse_script = unuse_scripts[i][0]
+            unuse_scripts[i] = unuse_script
+            if not os.path.exists(unuse_script):
+                msg = "Script: " + unuse_script + " does not exist."
+                display_error(msg)
+                sys.exit(1)
+            if ENFORCE_PERMISSIONS:
+                if not validate_permissions(unuse_script, LEGAL_PERMISSIONS):
+                    if DISPLAY_PERMISSIONS_VIOLATIONS:
+                        handle_permission_violation(unuse_script)
+                    sys.exit(1)
+
         cmd.extend(unuse_scripts)
 
     # Clean up the history file
