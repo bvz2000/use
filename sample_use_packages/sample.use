@@ -1,0 +1,71 @@
+# This is a sample use file. Note that this is more complex than a normal use
+# file in that it has multiple alias' and multiple env vars. This is just done
+# to show that this is possible.
+
+# [branch]
+# The "branch" is always a single item, and is usually the name of the app
+# itself. It is used so that unuse commands can go through the history of used
+# items in the current shell and unuse any previous items in the same "branch"
+# Essentially this means any new "use appname-<whatever>" commands will be able
+# to identify any previous versions of the same type and undo what they had
+# done before using the new version.
+
+# [alias]
+# Alias just sets up any alias' for the current shell. There may be as many as
+# desired.
+
+# [env]
+# Env defines env variables for the current shell. There may be as many as
+# desired.
+
+# [path-prepend-PATH_VAR_NAME]
+# Path-prepend is a series of paths to prepend to the given variable variable.
+# The variable is given in the section name (PATH_VAR_NAME in this case).
+# Each line is simply a path. For example:
+# /this/is/the/path/to/prepend
+#    or
+# /this/is/another/path/to/prepend
+# There may be as many as desired.
+
+# [path-postpend-PATH_VAR_NAME]
+# Path-postpend is the same, but these paths will be appended to the end of each
+# of the variables.
+
+# [use-scripts]
+# Use-scripts is a series of outside scripts to source when use is invoked.
+# These scripts must be shell scripts as they will be sourced.
+
+# [unuse-scripts]
+# Use-scripts is a series of outside scripts to source when unuse is invoked.
+# These scripts must be shell scripts as they will be sourced.
+
+# The use system also has a few built-in variables that will be expanded
+# automatically. These are values that are set by the use.py app based on
+# calculations it does. So far this only includes the following:
+#
+# $VERSION <- the version number of the current use package.
+#
+# Wherever one of these variables is used in this file, it will be replaced by
+# the value of that variable before the use command is run. The use of these
+# variables is optional. See below for examples of their usage.
+
+[branch]
+clarisse
+
+[env]
+CLARISSE_HOME=/opt/apps/isotropix/clarisse
+
+[alias]
+clarisse=/opt/apps/isotropix/clarisse/$VERSION/wrapper/clarisse.sh
+
+[desktop]
+desktop=/opt/apps/isotropix/clarisse/$VERSION/wrapper/clarisse.desktop
+
+[path-prepend-IX_SHELF_CONFIG_FILE]
+
+[path-postpend-IX_SHELF_CONFIG_FILE]
+/opt/apps/isotropix/clarisse/$VERSION/app/shelves/shelf.cfg
+
+[use-scripts]
+
+[unuse-scripts]
