@@ -65,7 +65,7 @@ fi
 
 if [ "$1" == "use" ]; then
 
-    unuse_pkg=`$python_script package_from_branch $2`
+    unuse_pkg=`$python_script unuse_package_from_use_package $2`
     eval `alias | $python_script unuse $unuse_pkg`
     eval `alias | $python_script use $2`
 
