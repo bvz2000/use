@@ -1,7 +1,17 @@
 # use
-A command line tool (and support structure) that switches between different installed versions of an app. This allows multiple versions of the same app to be installed (and used) at the same time
+A command line tool (and support structure) that switches between different installed versions of an app. This allows multiple versions of the same app to be installed (and used) at the same time. It is designed to work under UNIX-like systems like Linux and MacOS. It *may* work with WSL (Windows Subsystem for Linux) but is untested.
 
 This toolset is based on a system that we use where I work.  This is my own interpretation and implementation.
+
+# Installation
+TODO
+
+# Environment
+Use understands the following environmental variables:
+
+USE_PKG_PATHS: This is a list of directories to search for use package files.
+
+USE_PKG_SEARCH_RECURSIVE: If this is set to true or 1, then sub-directories of the dirs listed above will also be searched. Otherwise, only those dirs listed above (and no sub-directories) will be searched. If this env variable is missing, then it will default to True.
 
 # How the system works from an end-user perspective:
 Assume you have two (or more) versions of an app (say, Blender-2.78 and Blender-2.79) on your system.
