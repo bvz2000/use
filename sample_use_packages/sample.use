@@ -1,6 +1,8 @@
 # This is a sample use file. Note that this is more complex than a normal use
-# file in that it has multiple alias' and multiple env vars. This is just done
-# to show that this is possible.
+# file in that it has multiple alias' and multiple env vars. It also uses the
+# $VERSION, $USE_PKG_PATH, $VERSION_PATH, and $PRE_VERSION_PATH variables, but
+# in ways that are kind of absurd and wouldn't usually be done in a production
+# environment. This is just done to show what kinds of things are possible.
 
 # [branch]
 # The "branch" is always a single item, and is usually the name of the app
@@ -40,22 +42,42 @@
 # sections as you need. One for each variable.
 
 # [use-scripts]
-# Use-scripts is a series of outside scripts to source when use is invoked.
+# Use-scripts are a series of outside scripts to source when use is invoked.
 # These scripts must be shell scripts as they will be sourced. For the sake of
 # security, these scripts must be owned by root and may not be writable by
-# anyone outside of root. There may be as many scripts as needed.
+# anyone outside of root (depending on settings embedded in the use.py code).
+# There may be as many scripts as needed.
 
 # [unuse-scripts]
-# Use-scripts is a series of outside scripts to source when unuse is invoked.
+# Unuse-scripts are a series of outside scripts to source when unuse is invoked.
 # These scripts must be shell scripts as they will be sourced. They have the
 # same permissions requirements as the use scripts. There may be as many scripts
 # as needed.
 
+# [use-cmds]
+# Use-cmds is a series of single line bash commands to source when use is
+# invoked.
+
+# [unuse-cmds]
+# Unuse-cmds is a series of single line bash commands to source when unuse is
+# invoked.
+
 # The use system also has a few built-in variables that will be expanded
-# automatically. These are values that are set by the use.py app based on
-# calculations it does. So far this only includes the following:
+# automatically. So far this only includes the following:
 #
-# $VERSION <- the version number of the current use package.
+# $VERSION
+#      The version number of the current use package. This is automatically
+#      calculated by the system if auto-versioning is enabled. This variable is
+#      is NOT available at all if auto-versioning is not enabled.
+#
+# $USE_PKG_PATH
+#      The path to where the use package lives.
+#
+# $VERSION_PATH
+#      A path up to where the version is (including the version).
+#
+# $PRE_VERSION_PATH
+#      A path up to the version, but not including the version.
 #
 # Wherever one of these variables is used in this file, it will be replaced by
 # the value of that variable before the use command is run. The use of these
@@ -72,22 +94,28 @@ SOME_BLENDER_RELATED_ENV_VAR=some_value
 SOME_OTHER_VAR=some_other_value
 
 [alias]
-blender=/opt/apps/blender/blender/$VERSION/wrapper/blender.sh
-bl=/opt/apps/blender/blender/$VERSION/wrapper/blender.sh
-random=ls -al
+blender=$USE_PKG_PATH/blender.sh
+bl=$VERSION_PATH/wrapper/blender.sh
+some_other_alias=ls -al
 
 [desktop]
-desktop=/opt/apps/isotropix/clarisse/$VERSION/wrapper/clarisse.desktop
+desktop=$USE_PKG_PATH/clarisse.desktop
 
 [path-prepend-IX_SHELF_CONFIG_FILE]
 /some/path/that/I/want/to/prepend/to/the/IX_SHELF_CONFIG_FILE/var
 /This/is/a/second/path/to/prepend/to/this/var
 
 [path-postpend-IX_SHELF_CONFIG_FILE]
-/opt/apps/isotropix/clarisse/$VERSION/app/shelves/shelf.cfg
+$PRE_VERSION_PATH/$VERSION/app/shelves/shelf.cfg
 
 [use-scripts]
 /some/script/to/run/when/use/is/invoked.sh
 
 [unuse-scripts]
 /some/script/to/run/when/unuse/is/invoked.sh
+
+[use-cmds]
+ls -l
+
+[unuse-cmds]
+echo THIS IS A TEST
