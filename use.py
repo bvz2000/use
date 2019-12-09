@@ -27,27 +27,36 @@ LEGAL_COMMANDS = [
 # these permissions will not be allowed to run for security purposes)
 LEGAL_PERMISSIONS = [644, 744, 754, 755, 654, 655, 645]
 
-# Whether to enforce these permissions. Should almost always be set to True
-# unless the system is under development.
-ENFORCE_PERMISSIONS = True
+# Whether to enforce these permissions. Should almost always be set to False
+# when doing development. Whether to set these to True for actual production is
+# up to your sense of comfort. The idea behind setting restrictive permissions
+# is that this system will call arbitrary commands that may be invisible to the
+# end user if they are not actively examining the .use files and checking the
+# provenance of any scripts that these arbitrary commands have.
+#
+# That said, if someone has compromised your system and installed user-level
+# malicious code, you probably have bigger problems than having this system
+# execute this code. Still, the best practice would be to enable all of the
+# permission checking.
+#
+# There are three options:
+# Enforce app permissions means this use.py file must be owned by root and only
+# writable by root.
+# Enforce use pkg permissions means that any use packages must be owned by root
+# and only writable by root.
+# Enforce called script permissions means that any scripts called by a use
+# package must be owned by root and only writable by root.
+ENFORCE_APP_PERMISSIONS = False
+ENFORCE_USE_PKG_PERMISSIONS = False
+ENFORCE_CALLED_SCRIPT_PERMISSIONS = True
 
-# Show errors for use packages that do not meet the permissions requirements, or
-# simply ignore them silently.
+# Show errors for use packages or files that do not meet the permissions
+# requirements, or simply ignore them silently.
 DISPLAY_PERMISSIONS_VIOLATIONS = True
 
-# Automatically handle use package version numbers. This way, a use package
-# named "clarisse.use" will be presented to the user as "clarisse-3.6sp7" based
-# on its location in a path hierarchy that includes a version number somewhere.
-# This means all versioning is handled simply by putting the files into a new
-# path with a new version number. This setting can be overridden by using an
-# env variable described below. Auto versions and non-auto versions may not be
-# mixed. I.e. if auto versions are true, then every use package must live in a
-# versioned directory.
-DEFAULT_DO_AUTO_VERSION = True
-
-# If DEFAULT_DO_AUTO_VERSION is true, then this is an offset that indicates
-# where the version number is in the path (relative to the use package). So, for
-# example, if the path to a use package is:
+# This is an offset that indicates where the version number is in the path
+# (relative to the use package). So, for example, if the path to a use package
+# is:
 #   /opt/apps/isotropix/clarisse/3.6sp7/wrapper/clarisse.use
 # then the relative path offset is -2 (i.e. parent dir is -1, grandparent dir is
 # -2, and so on). The values do not have to be negative as only the absolute
@@ -58,10 +67,13 @@ DEFAULT_DO_AUTO_VERSION = True
 # overridden by using an env variable set below.
 DEFAULT_AUTO_VERSION_OFFSET = 2
 
-# Where to look for use packages. This setting can be overridden by using an env
-# variable set below.
-DEFAULT_USE_PKG_PATHS = "/opt/apps/:/opt/use/:"
-DEFAULT_USE_PKG_PATHS += os.path.expanduser("/Documents/dev/use/")
+# Where to look for auto version use packages. This setting can be overridden by
+# using an env variable set below.
+DEFAULT_USE_PKG_AV_PATHS = "/opt/apps/"
+
+# Where to look for baked version use packages. This setting can be overridden
+# by using an env variable set below.
+DEFAULT_USE_PKG_BV_PATHS = "/opt/use/"
 
 # Whether to search sub-directories of the use package paths. This setting can
 # be overridden by using an env variable set below.
@@ -70,7 +82,8 @@ DEFAULT_DO_RECURSIVE_SEARCH = True
 # Env variables (some of which might contain settings that will override the
 # above settings)
 USE_PKG_AVAILABLE_PACKAGES_ENV = "USE_PKG_PACKAGES"
-USE_PKG_SEARCH_PATHS_ENV = "USE_PKG_SEARCH_PATHS"
+USE_PKG_AV_SEARCH_PATHS_ENV = "USE_PKG_AUTO_VER_SEARCH_PATHS"
+USE_PKG_BV_SEARCH_PATHS_ENV = "USE_PKG_BAKED_VER_SEARCH_PATHS"
 USE_PKG_SEARCH_RECURSIVE_ENV = "USE_PKG_SEARCH_RECURSIVE"
 USE_PKG_HISTORY_FILE_ENV = "USE_PKG_HISTORY_FILE"
 USE_PKG_AUTO_VERSION_ENV = "USE_PKG_AUTO_VERSION"
@@ -140,7 +153,46 @@ def get_env(var,
 
 
 # ------------------------------------------------------------------------------
-def read_env():
+def sort_list_of_strings_by_length(unsorted_list,
+                                   inverse=False):
+    """
+    Given a list, sorts this list so that the shortest elements come first. If
+    two or more items have the same length, there is no defined order in which
+    they will be sorted.
+
+    Only works on lists of strings. If any element is not a string, raises an
+    assertion error.
+
+    :param unsorted_list: The list to sort.
+    :param inverse: If True, then the list will be sorted in inverse order.
+
+    :return: A new list where the shortest elements come first.
+    """
+
+    temp = dict()
+
+    for item in unsorted_list:
+        if not isinstance(item, str):
+            raise AssertionError("sorting may only be done on lists of strings")
+
+    for item in unsorted_list:
+        length = len(item)
+        try:
+            temp[length].append(item)
+        except KeyError:
+            temp[length] = [item]
+
+    output = list()
+    keys = list(temp.keys())
+    keys.sort(reverse=inverse)
+    for key in keys:
+        output.extend(temp[key])
+
+    return output
+
+
+# ------------------------------------------------------------------------------
+def read_user_settings_from_env():
     """
     Reads some specific settings from the env. If they are missing, then it uses
     the built in constants.
@@ -152,10 +204,15 @@ def read_env():
 
     output = dict()
 
-    # Search paths (converted to a list)
-    output["pkg_search_paths"] = get_env(USE_PKG_SEARCH_PATHS_ENV,
-                                         DEFAULT_USE_PKG_PATHS)
-    output["pkg_search_paths"] = output["pkg_search_paths"].split(":")
+    # Auto Version Search paths (converted to a list)
+    output["pkg_av_search_paths"] = get_env(USE_PKG_AV_SEARCH_PATHS_ENV,
+                                            DEFAULT_USE_PKG_AV_PATHS)
+    output["pkg_av_search_paths"] = output["pkg_av_search_paths"].split(":")
+
+    # Baked Version Search paths (converted to a list)
+    output["pkg_bv_search_paths"] = get_env(USE_PKG_BV_SEARCH_PATHS_ENV,
+                                            DEFAULT_USE_PKG_BV_PATHS)
+    output["pkg_bv_search_paths"] = output["pkg_bv_search_paths"].split(":")
 
     # Whether to search recursively, converted to a boolean
     output["do_recursive_search"] = get_env(USE_PKG_SEARCH_RECURSIVE_ENV,
@@ -170,19 +227,6 @@ def read_env():
     else:
         output["do_recursive_search"] = False
 
-    # Whether to use auto-versioning of the use packages, converted to a boolean
-    output["do_auto_version"] = get_env(USE_PKG_AUTO_VERSION_ENV,
-                                        str(DEFAULT_DO_AUTO_VERSION))
-    if output["do_auto_version"].upper() not in ["TRUE", "FALSE"]:
-        msg = "Environmental variable: " + USE_PKG_AUTO_VERSION_ENV
-        msg += " must be either 'True' or 'False'. Exiting."
-        display_error(msg)
-        sys.exit(1)
-    if output["do_auto_version"].upper() == "TRUE":
-        output["do_auto_version"] = True
-    else:
-        output["do_auto_version"] = False
-
     # Get the default offset for auto versions, converted to an integer
     output["auto_version_offset"] = get_env(USE_PKG_AUTO_VERSION_OFFSET_ENV,
                                             DEFAULT_AUTO_VERSION_OFFSET)
@@ -195,6 +239,40 @@ def read_env():
         sys.exit(1)
 
     return output
+
+
+# ------------------------------------------------------------------------------
+def get_version_path(use_pkg_path,
+                     path_offset):
+    """
+    Gets the version path from the use pkg path. It uses the path_offset
+    to find which parent dir is the version dir. May be either a positive or
+    negative number (only the absolute value is used). For example, if the
+    offset is 2 and the path to the use pkg is:
+
+    /opt/apps/isotropix/clarisse/2.0sp1/wrapper/clarisse.use
+
+    then the version path will be found two steps up the path from the use file,
+    i.e.:
+
+    /opt/apps/isotropix/clarisse/2.0sp1/
+
+    :param use_pkg_path: The path to the use package we want to get the version
+           from.
+    :param path_offset: The number of paths to step up through to find the
+           version number. Defaults to the global variable AUTO_VERSION_OFFSET.
+           Can be either a positive or negative value. Only the absolute value
+           is used.
+
+    :return: A string containing the version path.
+    """
+    path_offset = abs(path_offset)
+
+    remaining_path = use_pkg_path
+    for i in range(path_offset):
+        remaining_path = os.path.split(remaining_path)[0]
+
+    return remaining_path
 
 
 # ------------------------------------------------------------------------------
@@ -222,11 +300,7 @@ def get_version(use_pkg_path,
 
     :return: A string containing the version.
     """
-    path_offset = abs(path_offset)
-
-    remaining_path = use_pkg_path
-    for i in range(path_offset):
-        remaining_path = os.path.split(remaining_path)[0]
+    remaining_path = get_version_path(use_pkg_path, path_offset)
 
     return os.path.split(remaining_path)[1]
 
@@ -240,9 +314,12 @@ def get_built_in_vars(use_pkg_path,
     text replacement. This function defines these variables and returns them in
     the format of a dictionary.
 
-    At the moment, the variables they system understands are:
+    At the moment, the variables the system understands are:
 
     VERSION <- the version number of the current use package.
+    USE_PKG_PATH <- a path to where the use package is.
+    VERSION_PATH <- a path up to where the version is.
+    PRE_VERSION_PATH <- a path up to the version, but not including the version.
 
     :param use_pkg_path: The path to the use package we want to get the version
            from.
@@ -257,6 +334,9 @@ def get_built_in_vars(use_pkg_path,
 
     output = dict()
     output["VERSION"] = get_version(use_pkg_path, path_offset)
+    output["USE_PKG_PATH"] = os.path.split(use_pkg_path)[0]
+    output["VERSION_PATH"] = get_version_path(use_pkg_path, path_offset)
+    output["PRE_VERSION_PATH"] = os.path.split(output["VERSION_PATH"])[0]
 
     return output
 
@@ -354,10 +434,8 @@ def handle_permission_violation(file_name):
     if DISPLAY_PERMISSIONS_VIOLATIONS:
         display_error(
             file_name,
-            " must be owned by root and only writable by root.")
-    if ENFORCE_PERMISSIONS:
-        display_error("Exiting.")
-        sys.exit(1)
+            "must be owned by root and only writable by root. Exiting.")
+    sys.exit(1)
 
 
 # ------------------------------------------------------------------------------
@@ -395,6 +473,11 @@ def evaluate_use_pkg_file(file_n,
                                   auto_version_offset)
             file_n = os.path.splitext(file_n)[0]
             file_n += "-" + version + os.path.splitext(file_n)[1]
+        else:
+            file_n = os.path.splitext(file_n)[0]
+        if ENFORCE_USE_PKG_PERMISSIONS:
+            if not validate_permissions(full_p, LEGAL_PERMISSIONS):
+                return None
         return file_n, full_p
     return None
 
@@ -412,8 +495,7 @@ def find_all_use_pkg_files(search_paths,
            before the .use. This version number will be extracted from the
            path. It will be added in the format: "-<version>". For example:
            clarisse.use would become clarisse-3.6sp7.use (where the version is
-           "3.7sp7"). This will also auto-add a "latest" version that is based
-           on a sort of available versions and points to the highest version.
+           "3.6sp7").
     :param auto_version_offset: The offset that indicates which parent directory
            defines the version number. 1 = use package directory. 2 = parent
            of use package directory, 3 = grandparent, etc.
@@ -452,8 +534,8 @@ def find_all_use_pkg_files(search_paths,
 
 
 # ------------------------------------------------------------------------------
-def cmd_to_write_use_pkg_files_to_env(search_paths,
-                                      auto_version,
+def cmd_to_write_use_pkg_files_to_env(av_search_paths,
+                                      bv_search_paths,
                                       auto_version_offset,
                                       recursive):
     """
@@ -463,13 +545,10 @@ def cmd_to_write_use_pkg_files_to_env(search_paths,
     name1;path1:name2;path2:...:nameN;pathN
 
 
-    :param search_paths: A list of paths where the use packages could live.
-    :param auto_version: If True, then the version number will be added just
-           before the .use. This version number will be extracted from the
-           path. It will be added in the format: "-<version>". For example:
-           clarisse.use would become clarisse-3.6sp7.use (where the version is
-           "3.7sp7"). This will also auto-add a "latest" version that is based
-           on a sort of available versions and points to the highest version.
+    :param av_search_paths: A list of paths where the auto version use packages
+           could live.
+    :param bv_search_paths: A list of paths where the baked version use packages
+           could live.
     :param auto_version_offset: The offset that indicates which parent directory
            defines the version number. 1 = use package directory. 2 = parent
            of use package directory, 3 = grandparent, etc.
@@ -480,13 +559,22 @@ def cmd_to_write_use_pkg_files_to_env(search_paths,
     """
 
     use_pkg_files = list()
-    use_pkgs = find_all_use_pkg_files(search_paths,
-                                      auto_version,
-                                      auto_version_offset,
-                                      recursive)
+    av_use_pkgs = find_all_use_pkg_files(av_search_paths,
+                                         True,
+                                         auto_version_offset,
+                                         recursive)
 
-    for use_pkg in use_pkgs.keys():
-        use_pkg_files.append(use_pkg + "@" + use_pkgs[use_pkg])
+    bv_use_pkgs = find_all_use_pkg_files(bv_search_paths,
+                                         False,
+                                         0,
+                                         recursive)
+
+    for key in bv_use_pkgs.keys():
+        if key not in av_use_pkgs.keys():
+            av_use_pkgs[key] = bv_use_pkgs[key]
+
+    for use_pkg in av_use_pkgs.keys():
+        use_pkg_files.append(use_pkg + "@" + av_use_pkgs[use_pkg])
 
     output = ":".join(use_pkg_files)
     output = "export " + USE_PKG_AVAILABLE_PACKAGES_ENV + "=" + output
@@ -789,6 +877,40 @@ def get_use_package_unuse_scripts(use_pkg_obj):
 
 
 # ------------------------------------------------------------------------------
+def get_use_package_use_cmds(use_pkg_obj):
+    """
+    Returns any additional shell scripts to run as part of a use command from
+    the use_pkg_obj.
+
+    :param use_pkg_obj: The config parser object, undelimited.
+
+    :return: A list of key/value tuples containing all of the bash commands.
+    """
+
+    try:
+        return use_pkg_obj.items("use-cmds")
+    except configparser.NoSectionError:
+        return []
+
+
+# ------------------------------------------------------------------------------
+def get_use_package_unuse_cmds(use_pkg_obj):
+    """
+    Returns any additional shell scripts to run as part of an unuse command from
+    the use_pkg_obj.
+
+    :param use_pkg_obj: The config parser object, undelimited.
+
+    :return: A list of key/value tuples containing all of the unuse commands.
+    """
+
+    try:
+        return use_pkg_obj.items("unuse-cmds")
+    except configparser.NoSectionError:
+        return []
+
+
+# ------------------------------------------------------------------------------
 def format_aliases_for_shell(aliases, variables):
     """
     Formats the aliases that are read directly from the config object as a
@@ -807,7 +929,10 @@ def format_aliases_for_shell(aliases, variables):
         output += "="
         output += "'" + aliases[alias] + "';"
 
-    for key in variables.keys():
+    replace_keys = list(variables.keys())
+    replace_keys = sort_list_of_strings_by_length(replace_keys, True)
+
+    for key in replace_keys:
         output = output.replace("$" + key, variables[key])
 
     return output.rstrip(";")
@@ -832,7 +957,10 @@ def format_env_vars_for_shell(env_vars, variables):
         output += "="
         output += "'" + env_vars[env_var] + "';"
 
-    for key in variables.keys():
+    replace_keys = list(variables.keys())
+    replace_keys = sort_list_of_strings_by_length(replace_keys, True)
+
+    for key in replace_keys:
         output = output.replace("$" + key, variables[key])
 
     return output.strip(";")
@@ -875,7 +1003,10 @@ def format_paths_for_shell(path_prepends,
         except KeyError:
             postpends = []
 
-        for sub_var in sub_vars.keys():
+        replace_keys = list(sub_vars.keys())
+        replace_keys = sort_list_of_strings_by_length(replace_keys, True)
+
+        for sub_var in replace_keys:
             for i in range(len(prepends)):
                 prepends[i] = prepends[i].replace("$" + sub_var,
                                                   sub_vars[sub_var])
@@ -912,6 +1043,32 @@ def format_paths_for_shell(path_prepends,
 
 
 # ------------------------------------------------------------------------------
+def format_scripts_for_shell(scripts, variables):
+    """
+    Generates the list of scripts to run as bash commands.
+
+    :param scripts: A list of scripts.
+    :param variables: A dict of string substitutions to perform.
+
+    :return: A string containing the raw bash shell commands read from the use
+             package file.
+    """
+
+    output = list()
+
+    replace_keys = list(variables.keys())
+    replace_keys = sort_list_of_strings_by_length(replace_keys, True)
+
+    for cmd in scripts:
+        cmd = cmd[0]
+        for key in replace_keys:
+            cmd = cmd.replace("$" + key, variables[key])
+        output.append(cmd)
+
+    return ";".join(output)
+
+
+# ------------------------------------------------------------------------------
 def format_cmds_for_shell(cmds, variables):
     """
     Generates the free-form bash commands.
@@ -925,9 +1082,12 @@ def format_cmds_for_shell(cmds, variables):
 
     output = list()
 
+    replace_keys = list(variables.keys())
+    replace_keys = sort_list_of_strings_by_length(replace_keys, True)
+
     for cmd in cmds:
         cmd = cmd[0]
-        for key in variables.keys():
+        for key in replace_keys:
             cmd = cmd.replace("$" + key, variables[key])
         output.append(cmd)
 
@@ -1026,6 +1186,8 @@ def write_history(use_pkg_name,
                   new_path_postpends,
                   use_scripts,
                   unuse_scripts,
+                  use_cmds,
+                  unuse_cmds,
                   modified_aliases,
                   modified_env_vars,
                   modified_path_vars):
@@ -1049,6 +1211,8 @@ def write_history(use_pkg_name,
            use scripts being run by this use package.
     :param unuse_scripts: A list of key/value tuples listing the bash shell
            unuse scripts being run by this use package.
+    :param use_cmds: A list of the single line use cmds.
+    :param unuse_cmds: A list of the single line unuse cmds.
     :param modified_aliases: A list of key/value tuples listing the existing
            aliases that will be overwritten by the new aliases in this use
            package.
@@ -1099,6 +1263,8 @@ def write_history(use_pkg_name,
     hist_obj.set(branch, "new_path_postpends", str(new_path_postpends))
     hist_obj.set(branch, "use_scripts", str(use_scripts))
     hist_obj.set(branch, "unuse_scripts", str(unuse_scripts))
+    hist_obj.set(branch, "use_cmds", str(use_cmds))
+    hist_obj.set(branch, "unuse_cmds", str(unuse_cmds))
     hist_obj.set(branch, "existing_aliases", str(modified_aliases))
     hist_obj.set(branch, "existing_env_vars", str(modified_env_vars))
     hist_obj.set(branch, "existing_path_vars", str(modified_path_vars))
@@ -1165,6 +1331,17 @@ def use(use_pkg_name, raw_aliases):
     path_postpends = get_use_package_path_appends(use_obj_delim, False)
     use_scripts = get_use_package_use_scripts(use_obj_undelim)
     unuse_scripts = get_use_package_unuse_scripts(use_obj_undelim)
+    use_cmds = get_use_package_use_cmds(use_obj_undelim)
+    unuse_cmds = get_use_package_unuse_cmds(use_obj_undelim)
+
+    # Validate the permissions of the use and unuse scripts.
+    if ENFORCE_CALLED_SCRIPT_PERMISSIONS:
+        for script in use_scripts:
+            if not validate_permissions(script[0], LEGAL_PERMISSIONS):
+                handle_permission_violation(script[0])
+        for script in unuse_scripts:
+            if not validate_permissions(script[0], LEGAL_PERMISSIONS):
+                handle_permission_violation(script[0])
 
     # Unuse the previous version of this package (if it exists)
     try:
@@ -1195,7 +1372,8 @@ def use(use_pkg_name, raw_aliases):
     bash_cmd.append(format_paths_for_shell(path_prepends,
                                            path_postpends,
                                            substitutions))
-    bash_cmd.append(format_cmds_for_shell(use_scripts, substitutions))
+    bash_cmd.append(format_scripts_for_shell(use_scripts, substitutions))
+    bash_cmd.append(format_cmds_for_shell(use_cmds, substitutions))
     bash_cmd = ";".join(bash_cmd)
     while ";;" in bash_cmd:
         bash_cmd = bash_cmd.replace(";;", ";")
@@ -1218,7 +1396,7 @@ def use(use_pkg_name, raw_aliases):
             sys.exit(1)
 
     # Verify the use scripts and unuse scripts have the correct permissions
-    if ENFORCE_PERMISSIONS:
+    if ENFORCE_APP_PERMISSIONS:
         for use_script in use_scripts:
             use_script = use_script[0]
             if not validate_permissions(use_script, LEGAL_PERMISSIONS):
@@ -1263,6 +1441,8 @@ def use(use_pkg_name, raw_aliases):
                   new_path_postpends=path_postpends,
                   use_scripts=use_scripts,
                   unuse_scripts=unuse_scripts,
+                  use_cmds=use_cmds,
+                  unuse_cmds=unuse_cmds,
                   modified_aliases=modified_aliases,
                   modified_env_vars=modified_env_vars,
                   modified_path_vars=modified_path_vars)
@@ -1660,6 +1840,12 @@ def unuse(use_pkg_name,
     unuse_scripts = ast.literal_eval(unuse_scripts)
     if unuse_scripts:
 
+        # Validate the permissions of the use and unuse scripts.
+        if ENFORCE_CALLED_SCRIPT_PERMISSIONS:
+            for script in unuse_scripts:
+                if not validate_permissions(script[0], LEGAL_PERMISSIONS):
+                    handle_permission_violation(script[0])
+
         for i in range(len(unuse_scripts)):
             unuse_script = unuse_scripts[i][0]
             unuse_scripts[i] = unuse_script
@@ -1667,13 +1853,22 @@ def unuse(use_pkg_name,
                 msg = "Script: " + unuse_script + " does not exist."
                 display_error(msg)
                 sys.exit(1)
-            if ENFORCE_PERMISSIONS:
+            if ENFORCE_APP_PERMISSIONS:
                 if not validate_permissions(unuse_script, LEGAL_PERMISSIONS):
                     if DISPLAY_PERMISSIONS_VIOLATIONS:
                         handle_permission_violation(unuse_script)
                     sys.exit(1)
 
         cmd.extend(unuse_scripts)
+
+    # 5) add any unuse cmds
+    unuse_cmds = hist_obj.get(branch, "unuse_cmds")
+    unuse_cmds = ast.literal_eval(unuse_cmds)
+    if unuse_cmds:
+        for i in range(len(unuse_cmds)):
+            unuse_cmd = unuse_cmds[i][0]
+            unuse_cmds[i] = unuse_cmd
+        cmd.extend(unuse_cmds)
 
     # Clean up the history file
     hist_obj.remove_section(branch)
@@ -1750,23 +1945,32 @@ def setup():
     output = "export " + USE_PKG_HISTORY_FILE_ENV + "=" + use_history_file
 
     legal_path_found = False
-    for path in settings["pkg_search_paths"]:
+    for path in settings["pkg_av_search_paths"]:
+        if os.path.exists(path) and os.path.isdir(path):
+            legal_path_found = True
+    for path in settings["pkg_bv_search_paths"]:
         if os.path.exists(path) and os.path.isdir(path):
             legal_path_found = True
 
     if not legal_path_found:
         display_error("No use package directories found. I looked for:",
-                      ":".join(settings["pkg_search_paths"]))
+                      ":".join(settings["pkg_av_search_paths"]),
+                      "and",
+                      ":".join(settings["pkg_bv_search_paths"]))
         sys.exit(1)
 
-    # Store the use package search paths
-    output += ";export " + USE_PKG_SEARCH_PATHS_ENV
-    output += "=" + ":".join(settings["pkg_search_paths"])
+    # Store the auto version use package search paths
+    output += ";export " + USE_PKG_AV_SEARCH_PATHS_ENV
+    output += "=" + ":".join(settings["pkg_av_search_paths"])
+
+    # Store the baked version use package search paths
+    output += ";export " + USE_PKG_BV_SEARCH_PATHS_ENV
+    output += "=" + ":".join(settings["pkg_bv_search_paths"])
 
     # Save the existing use packages to an env var
     output += ";"
-    output += cmd_to_write_use_pkg_files_to_env(settings["pkg_search_paths"],
-                                                settings["do_auto_version"],
+    output += cmd_to_write_use_pkg_files_to_env(settings["pkg_av_search_paths"],
+                                                settings["pkg_bv_search_paths"],
                                                 settings["auto_version_offset"],
                                                 settings["do_recursive_search"])
 
@@ -1779,8 +1983,10 @@ def setup():
 if __name__ == "__main__":
 
     # Make sure this script is owned by root and only writable by root.
-    if not validate_permissions(os.path.abspath(__file__), LEGAL_PERMISSIONS):
-        handle_permission_violation(os.path.abspath(__file__))
+    if ENFORCE_APP_PERMISSIONS:
+        if not validate_permissions(os.path.abspath(__file__),
+                                    LEGAL_PERMISSIONS):
+            handle_permission_violation(os.path.abspath(__file__))
 
     # Only handle specific types of requests
     if sys.argv[1] not in LEGAL_COMMANDS:
@@ -1789,7 +1995,7 @@ if __name__ == "__main__":
         sys.exit(1)
 
     # Read the env and stuff its settings into the constants
-    settings = read_env()
+    settings = read_user_settings_from_env()
 
     # SETUP
     # ===========================
@@ -1801,14 +2007,6 @@ if __name__ == "__main__":
     if sys.argv[1] == "refresh":
         setup()
         sys.exit(0)
-
-    # # ===========================
-    # if sys.argv[1] == "symlink_latest":
-    #     symlink_latest(use_pkg_search_paths)
-    #
-    # # ===========================
-    # if sys.argv[1] == "update_desktop":
-    #     update_desktops(use_pkg_search_paths)
 
     # ===========================
     if sys.argv[1] == "unuse_package_from_use_package":
