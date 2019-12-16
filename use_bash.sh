@@ -27,17 +27,17 @@ python_script="`dirname $me`/use.py"
 if [ "$1" == "setup" ]; then
 
     # Run the python setup
-    eval `$python_script setup`
+    eval `$python_script bash setup`
 
     # Function to set up tab completion for the use command
     _use () {
-        local files=`$python_script complete_use "${COMP_WORDS[$COMP_CWORD]}"`
+        local files=`$python_script bash complete_use "${COMP_WORDS[$COMP_CWORD]}"`
         COMPREPLY=( ${files[@]} )
     }
 
     # Function to set up tab completion for the use command
     _unuse () {
-        local pkgs=`$python_script complete_unuse "${COMP_WORDS[$COMP_CWORD]}"`
+        local pkgs=`$python_script bash complete_unuse "${COMP_WORDS[$COMP_CWORD]}"`
         COMPREPLY=( ${pkgs[@]} )
     }
 
@@ -65,9 +65,9 @@ fi
 
 if [ "$1" == "use" ]; then
 
-    unuse_pkg=`$python_script unuse_package_from_use_package $2`
-    eval `alias | $python_script unuse $unuse_pkg`
-    eval `alias | $python_script use $2`
+    unuse_pkg=`$python_script bash unuse_package_from_use_package $2`
+    eval `alias | $python_script bash unuse $unuse_pkg`
+    eval `alias | $python_script bash use $2`
 
 fi
 
@@ -78,7 +78,7 @@ fi
 
 if [ "$1" == "used" ]; then
 
-    eval `$python_script used`
+    eval `$python_script bash used`
 
 fi
 
@@ -89,7 +89,7 @@ fi
 
 if [ "$1" == "unuse" ]; then
 
-    eval `alias | $python_script unuse $2`
+    eval `alias | $python_script bash unuse $2`
 
 fi
 
@@ -105,7 +105,7 @@ if [ "$1" == "symlink" ]; then
        echo "NOT work! You have to become root using 'su' and then re-run this"
        echo "command."
     else
-        eval `alias | $python_script symlink_latest`
+        eval `alias | $python_script bash symlink_latest`
     fi
 
 fi
@@ -120,7 +120,7 @@ if [ "$1" == "desktop" ]; then
     if [[ $EUID -ne 0 ]]; then
        echo "This script must be run as root."
     else
-        $python_script update_desktop $2
+        $python_script bash update_desktop $2
     fi
 
 fi
