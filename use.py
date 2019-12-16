@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 
 import ast
+from collections import OrderedDict
 import configparser
 import os
 import sys
@@ -21,6 +22,10 @@ LEGAL_COMMANDS = [
     "symlink_latest",
     "update_desktop",
     "test",
+]
+
+LEGAL_SHELLS = [
+    "bash",
 ]
 
 # A list of legal permissions for use packages (those that do not have one of
@@ -79,14 +84,13 @@ DEFAULT_USE_PKG_BV_PATHS = "/opt/use/"
 # be overridden by using an env variable set below.
 DEFAULT_DO_RECURSIVE_SEARCH = True
 
-# Env variables (some of which might contain settings that will override the
-# above settings)
+# Env variable names (some of which might contain settings that will override
+# the above defaults)
 USE_PKG_AVAILABLE_PACKAGES_ENV = "USE_PKG_PACKAGES"
 USE_PKG_AV_SEARCH_PATHS_ENV = "USE_PKG_AUTO_VER_SEARCH_PATHS"
 USE_PKG_BV_SEARCH_PATHS_ENV = "USE_PKG_BAKED_VER_SEARCH_PATHS"
 USE_PKG_SEARCH_RECURSIVE_ENV = "USE_PKG_SEARCH_RECURSIVE"
 USE_PKG_HISTORY_FILE_ENV = "USE_PKG_HISTORY_FILE"
-USE_PKG_AUTO_VERSION_ENV = "USE_PKG_AUTO_VERSION"
 USE_PKG_AUTO_VERSION_OFFSET_ENV = "USE_PKG_AUTO_VERSION_OFFSET"
 
 
@@ -150,45 +154,6 @@ def get_env(var,
         return os.environ[var]
     except KeyError:
         return default
-
-
-# ------------------------------------------------------------------------------
-def sort_list_of_strings_by_length(unsorted_list,
-                                   inverse=False):
-    """
-    Given a list, sorts this list so that the shortest elements come first. If
-    two or more items have the same length, there is no defined order in which
-    they will be sorted.
-
-    Only works on lists of strings. If any element is not a string, raises an
-    assertion error.
-
-    :param unsorted_list: The list to sort.
-    :param inverse: If True, then the list will be sorted in inverse order.
-
-    :return: A new list where the shortest elements come first.
-    """
-
-    temp = dict()
-
-    for item in unsorted_list:
-        if not isinstance(item, str):
-            raise AssertionError("sorting may only be done on lists of strings")
-
-    for item in unsorted_list:
-        length = len(item)
-        try:
-            temp[length].append(item)
-        except KeyError:
-            temp[length] = [item]
-
-    output = list()
-    keys = list(temp.keys())
-    keys.sort(reverse=inverse)
-    for key in keys:
-        output.extend(temp[key])
-
-    return output
 
 
 # ------------------------------------------------------------------------------
@@ -332,11 +297,17 @@ def get_built_in_vars(use_pkg_path,
              value.
     """
 
-    output = dict()
-    output["VERSION"] = get_version(use_pkg_path, path_offset)
+    # NOTE: the following items MUST be added in the order of longest key to
+    # shortest key.
+
+    output = OrderedDict()
+
+    version_path = get_version_path(use_pkg_path, path_offset)
+
+    output["PRE_VERSION_PATH"] = os.path.split(version_path)[0]
     output["USE_PKG_PATH"] = os.path.split(use_pkg_path)[0]
-    output["VERSION_PATH"] = get_version_path(use_pkg_path, path_offset)
-    output["PRE_VERSION_PATH"] = os.path.split(output["VERSION_PATH"])[0]
+    output["VERSION_PATH"] = version_path
+    output["VERSION"] = get_version(use_pkg_path, path_offset)
 
     return output
 
@@ -371,21 +342,6 @@ def display_error(*msgs):
     for item in msgs:
         message += str(item) + " "
     print(message.strip(" "), file=sys.stderr)
-
-
-# ------------------------------------------------------------------------------
-def export_shell_command(cmd):
-    """
-    Exports the command for the calling bash shell script to process. Pretty
-    simple, it just prints the command.
-
-    :param cmd: The command to pass back to the calling shell script.
-
-    :return: Nothing.
-    """
-
-    # Pretty easy, just print it to stdOut.
-    print(cmd)
 
 
 # ------------------------------------------------------------------------------
@@ -439,149 +395,6 @@ def handle_permission_violation(file_name):
 
 
 # ------------------------------------------------------------------------------
-def evaluate_use_pkg_file(file_n,
-                          dir_n,
-                          auto_version,
-                          auto_version_offset):
-    """
-    Given a path to a file, evaluates whether it is a use pkg file or not. If it
-    is, returns a tuple containing the use package name (including version, and
-    a path to this use package.
-
-    :param file_n: A path to a file.
-    :param dir_n: The path where the file is located.
-    :param auto_version: If True, then the version number will be added just
-           before the .use. This version number will be extracted from the
-           path. It will be added in the format: "-<version>". For example:
-           clarisse.use would become clarisse-3.6sp7.use (where the version is
-           "3.7sp7"). This will also auto-add a "latest" version that is based
-           on a sort of available versions and points to the highest version.
-    :param auto_version_offset: The offset that indicates which parent directory
-           defines the version number. 1 = use package directory. 2 = parent
-           of use package directory, 3 = grandparent, etc.
-
-    :return: A tuple where the first element is the name of the use package
-             (munged to include the version number if auto_version is true),
-             and the second value is the path to the use package. If the file
-             is not a valid use package, returns None.
-    """
-
-    if file_n.endswith(".use"):
-        full_p = os.path.join(dir_n, file_n)
-        if auto_version:
-            version = get_version(full_p,
-                                  auto_version_offset)
-            file_n = os.path.splitext(file_n)[0]
-            file_n += "-" + version + os.path.splitext(file_n)[1]
-        else:
-            file_n = os.path.splitext(file_n)[0]
-        if ENFORCE_USE_PKG_PERMISSIONS:
-            if not validate_permissions(full_p, LEGAL_PERMISSIONS):
-                return None
-        return file_n, full_p
-    return None
-
-
-# ------------------------------------------------------------------------------
-def find_all_use_pkg_files(search_paths,
-                           auto_version,
-                           auto_version_offset,
-                           recursive):
-    """
-    Finds all of the use packages:
-
-    :param search_paths: A list of paths where the use packages could live.
-    :param auto_version: If True, then the version number will be added just
-           before the .use. This version number will be extracted from the
-           path. It will be added in the format: "-<version>". For example:
-           clarisse.use would become clarisse-3.6sp7.use (where the version is
-           "3.6sp7").
-    :param auto_version_offset: The offset that indicates which parent directory
-           defines the version number. 1 = use package directory. 2 = parent
-           of use package directory, 3 = grandparent, etc.
-    :param recursive: If true, then all sub-dirs of the search paths will be
-           traversed as well.
-
-    :return: A dictionary of use package file names where the key is the name
-             of the use package, and the value is the full path to this use
-             package.
-    """
-
-    use_pkg_files = dict()
-    for search_path in search_paths:
-        if os.path.exists(search_path) and os.path.isdir(search_path):
-            if recursive:
-                for dir_n, dirs_n, files_n in os.walk(search_path):
-                    for file_n in files_n:
-                        result = evaluate_use_pkg_file(file_n,
-                                                       dir_n,
-                                                       auto_version,
-                                                       auto_version_offset)
-                        if result:
-                            use_pkg_files[result[0]] = result[1]
-
-            else:
-                files_n = os.listdir(search_path)
-                for file_n in files_n:
-                    result = evaluate_use_pkg_file(file_n,
-                                                   search_path,
-                                                   auto_version,
-                                                   auto_version_offset)
-                    if result:
-                        use_pkg_files[result[0]] = result[1]
-
-    return use_pkg_files
-
-
-# ------------------------------------------------------------------------------
-def cmd_to_write_use_pkg_files_to_env(av_search_paths,
-                                      bv_search_paths,
-                                      auto_version_offset,
-                                      recursive):
-    """
-    Finds all of the use packages and writes their names to an env var called
-    "USE_AVAILABLE_PACKAGES" in the format:
-
-    name1;path1:name2;path2:...:nameN;pathN
-
-
-    :param av_search_paths: A list of paths where the auto version use packages
-           could live.
-    :param bv_search_paths: A list of paths where the baked version use packages
-           could live.
-    :param auto_version_offset: The offset that indicates which parent directory
-           defines the version number. 1 = use package directory. 2 = parent
-           of use package directory, 3 = grandparent, etc.
-    :param recursive: If true, then all sub-dirs of the search paths will be
-           traversed as well.
-
-    :return: A string that is the bash shell command to create the env var.
-    """
-
-    use_pkg_files = list()
-    av_use_pkgs = find_all_use_pkg_files(av_search_paths,
-                                         True,
-                                         auto_version_offset,
-                                         recursive)
-
-    bv_use_pkgs = find_all_use_pkg_files(bv_search_paths,
-                                         False,
-                                         0,
-                                         recursive)
-
-    for key in bv_use_pkgs.keys():
-        if key not in av_use_pkgs.keys():
-            av_use_pkgs[key] = bv_use_pkgs[key]
-
-    for use_pkg in av_use_pkgs.keys():
-        use_pkg_files.append(use_pkg + "@" + av_use_pkgs[use_pkg])
-
-    output = ":".join(use_pkg_files)
-    output = "export " + USE_PKG_AVAILABLE_PACKAGES_ENV + "=" + output
-    return output
-
-
-# ------------------------------------------------------------------------------
 def get_use_package_names_and_paths_from_env():
     """
     Returns a dictionary of use package names and their full paths from the
@@ -601,20 +414,6 @@ def get_use_package_names_and_paths_from_env():
 
 
 # ------------------------------------------------------------------------------
-def get_use_package_names_from_env():
-    """
-    Returns a list of use package names only from the env. If more than one use
-    package has the exact same name, only one will be returned. Which one is
-    undefined.
-
-    :return: A list of use package names (de-duplicated)
-    """
-
-    use_pkgs = get_use_package_names_and_paths_from_env()
-    return use_pkgs.keys()
-
-
-# ------------------------------------------------------------------------------
 def get_use_package_path_from_env(use_pkg_name):
     """
     Given a specific use_pkg_name, returns the file path stored in the env var.
@@ -630,6 +429,24 @@ def get_use_package_path_from_env(use_pkg_name):
         return use_pkg_files[use_pkg_name]
     except KeyError:
         return None
+
+
+################################################################################
+# SHELL COMPLETIONS
+################################################################################
+
+# ------------------------------------------------------------------------------
+def get_use_package_names_from_env():
+    """
+    Returns a list of use package names only from the env. If more than one use
+    package has the exact same name, only one will be returned. Which one is
+    undefined.
+
+    :return: A list of use package names (de-duplicated)
+    """
+
+    use_pkgs = get_use_package_names_and_paths_from_env()
+    return use_pkgs.keys()
 
 
 # ------------------------------------------------------------------------------
@@ -655,7 +472,7 @@ def complete_use(stub):
     for use_pkg in use_pkgs:
         if use_pkg.startswith(stub):
             outputs.append(use_pkg)
-    export_shell_command("\n".join(outputs))
+    print("\n".join(outputs))
 
 
 # ------------------------------------------------------------------------------
@@ -681,62 +498,256 @@ def complete_unuse(stub):
     for use_pkg in use_pkgs:
         if use_pkg.startswith(stub):
             outputs.append(use_pkg)
-    export_shell_command("\n".join(outputs))
+    print("\n".join(outputs))
 
 
 # ------------------------------------------------------------------------------
-def read_use_pkg(use_pkg_file,
-                 *delimiters):
+def read_history():
     """
-    Reads in the contents of a use package and returns it in the form of a
-    configparser object (.ini file)
+    Reads in the history file given by history_file.
 
-    :param use_pkg_file: The use package to read.
-    :param delimiters: A list of different delimiters to use. If empty, then the
-           default of "\n" will be used.
-
-    :return: A configparser object.
+    :return: A config parser object containing the history.
     """
 
-    if not delimiters:
-        delimiters = tuple("\n")
+    # Make sure the history file exists and that we can find it
+    try:
+        history_file = os.environ[USE_PKG_HISTORY_FILE_ENV]
+    except KeyError:
+        display_error("No history file. Did you forget to run setup first?")
+        sys.exit(1)
+    if not os.path.exists(history_file):
+        display_error("History file",
+                      history_file,
+                      "does not exist. Did setup fail?")
+        sys.exit(1)
 
-    use_pkg_obj = configparser.ConfigParser(allow_no_value=True,
-                                            delimiters=delimiters,
-                                            empty_lines_in_values=True)
+    # Open the history file as a configparser object
+    hist_obj = configparser.ConfigParser()
+    hist_obj.read(history_file)
 
-    # Force configparser to maintain capitalization of keys
-    use_pkg_obj.optionxform = str
-    use_pkg_obj.read(use_pkg_file)
+    return hist_obj
 
-    return use_pkg_obj
 
+################################################################################
+# USE
+################################################################################
 
 # ------------------------------------------------------------------------------
-def verify_and_read_use_pkg(use_pkg_file):
+def read_use_pkg(use_pkg_file):
     """
     Opens a use package file (given by use_pkg_file). Verifies the package's
-    permissions first. Returns the use package as a configparser object twice.
-    Once delimited by '=', once undelimited.
+    permissions first. Returns the use package as a configparser object.
 
     :param use_pkg_file: The full path to the use package file.
 
-    :return: Tuple of config objects, the first elem is a configparser object
-             delimited by '=', the second is undelimited (technically it is
-             delimited by '\n', but that is effectively the same as being
-             undelimited).
+    :return: A configParser object.
     """
 
     # Verify the security of this file
     if not validate_permissions(use_pkg_file, LEGAL_PERMISSIONS):
         handle_permission_violation(use_pkg_file)
 
-    # Read this use package file (both delimited and undelimited)
-    delimited_use_pkg_obj = read_use_pkg(use_pkg_file, "=")
-    undelimited_use_pkg_obj = read_use_pkg(use_pkg_file, "\n")
+    use_pkg_obj = configparser.ConfigParser(allow_no_value=True,
+                                            delimiters="=",
+                                            empty_lines_in_values=True)
 
-    # Return both
-    return delimited_use_pkg_obj, undelimited_use_pkg_obj
+    # Force configparser to maintain capitalization of keys
+    use_pkg_obj.optionxform = str
+
+    try:
+        use_pkg_obj.read(use_pkg_file)
+    except configparser.DuplicateOptionError as e:
+        display_error("Duplicate entries in .use config file:", use_pkg_file)
+        display_error(e.message.split(":")[1])
+        display_error("Exiting")
+        sys.exit(1)
+
+    return use_pkg_obj
+
+
+# ------------------------------------------------------------------------------
+def get_use_package_item_list(use_pkg_obj,
+                              section,
+                              substitutions):
+    """
+    Returns a list of the items in the section given by "section". Assumes that
+    these are merely lists (vs. key/value pairs) and strips out the empty
+    value to return only what would be the keys.
+
+    :param use_pkg_obj: The config parser object.
+    :param section: The section to extract the list of items from.
+    :param substitutions: A dictionary of substitutions to perform (the keys
+           MUST be in descending order based on key length to avoid accidentally
+           doing a partial match (for example: we don't want to match $VERSION
+           when looking at $VERSION_PATH.
+
+    :return: A list of key/value tuples containing all of the bash commands.
+    """
+
+    assert section in [
+                       "branch",
+                       "use_scripts",
+                       "unuse_scripts",
+                       "use_cmds",
+                       "unuse_cmds",
+                      ]
+
+    try:
+        output = use_pkg_obj.items(section)
+    except configparser.NoSectionError:
+        return []
+
+    for i in range(len(output)):
+        output[i] = output[i][0]
+
+    for i in range(len(output)):
+        for sub in substitutions:
+            output[i] = output[i].replace("$" + sub, substitutions[sub])
+
+    return output
+
+
+# ------------------------------------------------------------------------------
+def get_use_package_key_value_pairs(use_pkg_obj,
+                                    section,
+                                    substitutions):
+    """
+    Returns all of the items from a specific section of the use_pkg_obj.
+
+    :param use_pkg_obj: The config parser object, delimited.
+    :param section: They type of item to return. Options are:
+           env
+           alias
+    :param substitutions: A dictionary of substitutions to perform (the keys
+           MUST be in descending order based on key length to avoid accidentally
+           doing a partial match (for example: we don't want to match $VERSION
+           when looking at $VERSION_PATH.
+
+    :return: A dict containing all of the items, where the key is the
+             name of the item and value is the value it is being set to.
+    """
+
+    assert section in ["env", "alias"]
+
+    output = dict()
+    try:
+        items = use_pkg_obj.items(section)
+    except (configparser.NoSectionError, configparser.NoOptionError):
+        return output
+
+    for item in items:
+        output[item[0]] = item[1]
+
+    for key in output.keys():
+        for sub in substitutions:
+            output[key] = output[key].replace("$" + sub, substitutions[sub])
+
+    return output
+
+
+# ------------------------------------------------------------------------------
+def get_use_package_path_appends(use_pkg_obj,
+                                 substitutions,
+                                 do_prepend=True):
+    """
+    Path prepends and postpends are a special case because there may be multiple
+    sections - one for each path variable - and we don't know how many there are
+    ahead of time. Returns a dictionary keyed with the path variable and where
+    the value is the path to either prepend or postpend.
+
+    :param use_pkg_obj: The config parser object.
+    :param substitutions: A dictionary of substitutions to perform (the keys
+           MUST be in descending order based on key length to avoid accidentally
+           doing a partial match (for example: we don't want to match $VERSION
+           when looking at $VERSION_PATH.
+    :param do_prepend: If True, look for prepends. Otherwise, look at postpends.
+
+    :return: A dictionary where the key is the path variable, and the value is a
+             list of paths to either prepend or postpend.
+    """
+
+    output = dict()
+    sections = use_pkg_obj.sections()
+
+    for section in sections:
+
+        if do_prepend:
+            match_str = "path-prepend-"
+        else:
+            match_str = "path-postpend-"
+
+        if section.startswith(match_str):
+            var = section.split(match_str)[1]
+            items = [value[0] for value in use_pkg_obj.items(section)]
+            output[var] = items
+
+        for key in output.keys():
+            for sub in substitutions:
+                for i in range(len(output[key])):
+                    output[key][i] = output[key][i].replace("$" + sub,
+                                                            substitutions[sub])
+
+    return output
+
+
+# ------------------------------------------------------------------------------
+def validate_use_pkg_permissions(use_pkg_file):
+    """
+    Makes sure that the passed use package file has the correct permissions.
+
+    :param use_pkg_file: A use package file to verify.
+
+    :return: Nothing.
+    """
+
+    # Validate the permissions of the use and unuse scripts.
+    if ENFORCE_USE_PKG_PERMISSIONS:
+        if not validate_permissions(use_pkg_file, LEGAL_PERMISSIONS):
+            handle_permission_violation(use_pkg_file)
+
+
+# ------------------------------------------------------------------------------
+def validate_script_permissions(scripts):
+    """
+    Makes sure the passed scripts (if they exist) have the correct permissions.
+
+    :param scripts: A list of scripts to verify.
+
+    :return: Nothing.
+    """
+
+    # Validate the permissions of the use and unuse scripts.
+    if ENFORCE_CALLED_SCRIPT_PERMISSIONS:
+        for script in scripts:
+            if os.path.exists(script):
+                if not validate_permissions(script, LEGAL_PERMISSIONS):
+                    handle_permission_violation(script)
+
+
+# ------------------------------------------------------------------------------
+def historical_use_pkg_from_branch(branch):
+    """
+    Returns the name of the previously used use package of the branch "branch"
+    if the history file has an entry for the given branch. Returns None if the
+    branch does not exist in the history file.
+
+    :param branch: The name of the branch.
+
+    :return: The name of the actual use package corresponding to the given
+             branch IF that branch exists in the history file.
+    """
+
+    try:
+        history_file = os.environ[USE_PKG_HISTORY_FILE_ENV]
+    except KeyError:
+        return None
+
+    hist_obj = configparser.ConfigParser()
+    hist_obj.read(history_file)
+
+    if hist_obj.has_section(branch):
+        return hist_obj.get(branch, "name")
+    return None
 
 
 # ------------------------------------------------------------------------------
@@ -759,339 +770,6 @@ def format_existing_aliases(raw_aliases):
         reformatted_aliases[key] = value.strip("'")
 
     return reformatted_aliases
-
-
-# ------------------------------------------------------------------------------
-def get_use_package_branch(use_pkg_obj):
-    """
-    Returns all of the branches from the use_pkg_obj.
-
-    :param use_pkg_obj: The config parser object, undelimited.
-
-    :return: A list of key/value tuples containing all of the branches.
-    """
-
-    try:
-        return use_pkg_obj.items("branch")[0][0]
-    except configparser.NoSectionError:
-        return ""
-
-
-# ------------------------------------------------------------------------------
-def get_use_package_path_appends(use_pkg_obj,
-                                 do_prepend=True):
-    """
-    Path prepends and postpends are a special case because there may be multiple
-    sections - one for each path variable - and we don't know how many there are
-    ahead of time. Returns a dictionary keyed with the path variable and where
-    the value is the path to either prepend or postpend.
-
-    :param use_pkg_obj: The config parser object, undelimited.
-    :param do_prepend: If True, look for prepends. Otherwise, look at postpends.
-
-    :return: A dictionary where the key is the path variable, and the value is a
-             list of paths to either prepend or postpend.
-    """
-
-    output = dict()
-    sections = use_pkg_obj.sections()
-
-    for section in sections:
-
-        if do_prepend:
-            match_str = "path-prepend-"
-        else:
-            match_str = "path-postpend-"
-
-        if section.startswith(match_str):
-            var = section.split(match_str)[1]
-            items = [value[0] for value in use_pkg_obj.items(section)]
-            output[var] = items
-
-    return output
-
-
-# ------------------------------------------------------------------------------
-def get_use_package_items(use_pkg_obj,
-                          item_type):
-    """
-    Returns all of the items from a specific section of the use_pkg_obj.
-
-    :param use_pkg_obj: The config parser object, delimited.
-    :param item_type: They type of item to return. Options are:
-           env
-           alias
-           path_prepend
-           path_postpend
-
-    :return: A dict containing all of the items, where the key is the
-             name of the item and value is the value it is being set to.
-    """
-
-    assert item_type in ["env", "alias"]
-
-    output = dict()
-    try:
-        items = use_pkg_obj.items(item_type)
-    except (configparser.NoSectionError, configparser.NoOptionError):
-        return output
-
-    for item in items:
-        output[item[0]] = item[1]
-
-    return output
-
-
-# ------------------------------------------------------------------------------
-def get_use_package_use_scripts(use_pkg_obj):
-    """
-    Returns any additional shell scripts to run as part of a use command from
-    the use_pkg_obj.
-
-    :param use_pkg_obj: The config parser object, undelimited.
-
-    :return: A list of key/value tuples containing all of the bash commands.
-    """
-
-    try:
-        return use_pkg_obj.items("use-scripts")
-    except configparser.NoSectionError:
-        return []
-
-
-# ------------------------------------------------------------------------------
-def get_use_package_unuse_scripts(use_pkg_obj):
-    """
-    Returns any additional shell scripts to run as part of an unuse command from
-    the use_pkg_obj.
-
-    :param use_pkg_obj: The config parser object, undelimited.
-
-    :return: A list of key/value tuples containing all of the unuse commands.
-    """
-
-    try:
-        return use_pkg_obj.items("unuse-scripts")
-    except configparser.NoSectionError:
-        return []
-
-
-# ------------------------------------------------------------------------------
-def get_use_package_use_cmds(use_pkg_obj):
-    """
-    Returns any additional shell scripts to run as part of a use command from
-    the use_pkg_obj.
-
-    :param use_pkg_obj: The config parser object, undelimited.
-
-    :return: A list of key/value tuples containing all of the bash commands.
-    """
-
-    try:
-        return use_pkg_obj.items("use-cmds")
-    except configparser.NoSectionError:
-        return []
-
-
-# ------------------------------------------------------------------------------
-def get_use_package_unuse_cmds(use_pkg_obj):
-    """
-    Returns any additional shell scripts to run as part of an unuse command from
-    the use_pkg_obj.
-
-    :param use_pkg_obj: The config parser object, undelimited.
-
-    :return: A list of key/value tuples containing all of the unuse commands.
-    """
-
-    try:
-        return use_pkg_obj.items("unuse-cmds")
-    except configparser.NoSectionError:
-        return []
-
-
-# ------------------------------------------------------------------------------
-def format_aliases_for_shell(aliases, variables):
-    """
-    Formats the aliases that are read directly from the config object as a
-    string ready for the bash shell.
-
-    :param aliases: A list of key/value tuples that contain the aliases.
-    :param variables: A dict of string substitutions to perform.
-
-    :return: A string containing the bash shell command to set the aliases.
-    """
-
-    output = ""
-    for alias in aliases.keys():
-        output += "alias "
-        output += alias
-        output += "="
-        output += "'" + aliases[alias] + "';"
-
-    replace_keys = list(variables.keys())
-    replace_keys = sort_list_of_strings_by_length(replace_keys, True)
-
-    for key in replace_keys:
-        output = output.replace("$" + key, variables[key])
-
-    return output.rstrip(";")
-
-
-# ------------------------------------------------------------------------------
-def format_env_vars_for_shell(env_vars, variables):
-    """
-    Generates the environmental variables.
-
-    :param env_vars: A list of key/value tuples that contain the env vars.
-    :param variables: A dict of string substitutions to perform.
-
-    :return: A string containing the bash shell command to set the env
-             variables.
-    """
-
-    output = ""
-    for env_var in env_vars.keys():
-        output += "export "
-        output += env_var
-        output += "="
-        output += "'" + env_vars[env_var] + "';"
-
-    replace_keys = list(variables.keys())
-    replace_keys = sort_list_of_strings_by_length(replace_keys, True)
-
-    for key in replace_keys:
-        output = output.replace("$" + key, variables[key])
-
-    return output.strip(";")
-
-
-# ------------------------------------------------------------------------------
-def format_paths_for_shell(path_prepends,
-                           path_postpends,
-                           sub_vars):
-    """
-    Given a list of path variables and values, appends the value to each of the
-    path variables.
-
-    :param path_prepends: A dictionary where the key is the name of the path
-           variable and the value is a list of paths to prepend to this var.
-    :param path_postpends: A dictionary where the key is the name of the path
-           variable and the value is a list of paths to postpend to this var.
-    :param sub_vars: A dict of string substitutions to perform.
-
-    :return: A string containing the bash shell command to set the path env
-             variable.
-    """
-
-    output = list()
-
-    # Build a merged list of path variables
-    path_vars = list(path_prepends.keys())
-    path_vars.extend(list(path_postpends.keys()))
-    path_vars = list(set(path_vars))
-
-    for path_var in path_vars:
-
-        try:
-            prepends = path_prepends[path_var]
-        except KeyError:
-            prepends = []
-
-        try:
-            postpends = path_postpends[path_var]
-        except KeyError:
-            postpends = []
-
-        replace_keys = list(sub_vars.keys())
-        replace_keys = sort_list_of_strings_by_length(replace_keys, True)
-
-        for sub_var in replace_keys:
-            for i in range(len(prepends)):
-                prepends[i] = prepends[i].replace("$" + sub_var,
-                                                  sub_vars[sub_var])
-            for i in range(len(postpends)):
-                postpends[i] = postpends[i].replace("$" + sub_var,
-                                                    sub_vars[sub_var])
-
-        try:
-            current_paths = os.environ[path_var]
-        except KeyError:
-            current_paths = ""
-        current_paths = current_paths.split(":")
-
-        # display_error("\n\n" + path_var + "\n----------------")
-        # display_error("Current Paths: " + str(current_paths))
-        # display_error("     prepends: " + str(prepends))
-        # display_error("    postpends: " + str(postpends))
-
-        actual_prepends = list()
-        for new_path in prepends:
-            if new_path not in current_paths:
-                actual_prepends.append(new_path)
-
-        actual_postpends = list()
-        for new_path in postpends:
-            if new_path not in current_paths:
-                actual_postpends.append(new_path)
-
-        new_paths = actual_prepends + current_paths + actual_postpends
-
-        output.append("export " + path_var + "=" + ":".join(new_paths))
-
-    return ";".join(output)
-
-
-# ------------------------------------------------------------------------------
-def format_scripts_for_shell(scripts, variables):
-    """
-    Generates the list of scripts to run as bash commands.
-
-    :param scripts: A list of scripts.
-    :param variables: A dict of string substitutions to perform.
-
-    :return: A string containing the raw bash shell commands read from the use
-             package file.
-    """
-
-    output = list()
-
-    replace_keys = list(variables.keys())
-    replace_keys = sort_list_of_strings_by_length(replace_keys, True)
-
-    for cmd in scripts:
-        cmd = cmd[0]
-        for key in replace_keys:
-            cmd = cmd.replace("$" + key, variables[key])
-        output.append(cmd)
-
-    return ";".join(output)
-
-
-# ------------------------------------------------------------------------------
-def format_cmds_for_shell(cmds, variables):
-    """
-    Generates the free-form bash commands.
-
-    :param cmds: A list of key/value tuples that contain the commands.
-    :param variables: A dict of string substitutions to perform.
-
-    :return: A string containing the raw bash shell commands read from the use
-             package file.
-    """
-
-    output = list()
-
-    replace_keys = list(variables.keys())
-    replace_keys = sort_list_of_strings_by_length(replace_keys, True)
-
-    for cmd in cmds:
-        cmd = cmd[0]
-        for key in replace_keys:
-            cmd = cmd.replace("$" + key, variables[key])
-        output.append(cmd)
-
-    return ";".join(output)
 
 
 # ------------------------------------------------------------------------------
@@ -1275,41 +953,16 @@ def write_history(use_pkg_name,
 
 
 # ------------------------------------------------------------------------------
-def read_history():
-    """
-    Reads in the history file given by history_file.
-
-    :return: A config parser object containing the history.
-    """
-
-    # Make sure the history file exists and that we can find it
-    try:
-        history_file = os.environ[USE_PKG_HISTORY_FILE_ENV]
-    except KeyError:
-        display_error("No history file. Did you forget to run setup first?")
-        sys.exit(1)
-    if not os.path.exists(history_file):
-        display_error("History file",
-                      history_file,
-                      "does not exist. Did setup fail?")
-        sys.exit(1)
-
-    # Open the history file as a configparser object
-    hist_obj = configparser.ConfigParser()
-    hist_obj.read(history_file)
-
-    return hist_obj
-
-
-# ------------------------------------------------------------------------------
-def use(use_pkg_name, raw_aliases):
+def use(use_pkg_name, 
+        raw_aliases):
     """
     Uses a new package (given by use_pkg_name). Processes this file and exports
     the contents converted into bash commands.
 
     :param use_pkg_name: A name of the use package (not the file name, just
            the package name. (Eg: clarisse-3.6sp2, and not clarisse-3.6sp2.use).
-    :param raw_aliases: The contents of the stdin.
+    :param raw_aliases: The contents of the stdin which should hold all of the
+           existing aliases.
 
     :return: Nothing
     """
@@ -1320,118 +973,70 @@ def use(use_pkg_name, raw_aliases):
         display_error("No use package named: " + use_pkg_name)
         return
 
-    # Read this use package file (both delimited and undelimited)
-    use_obj_delim, use_obj_undelim = verify_and_read_use_pkg(use_pkg_file)
+    validate_use_pkg_permissions(use_pkg_file)
+    use_obj = read_use_pkg(use_pkg_file)
 
-    # Extract the various bits of data we need from this config
-    branch = get_use_package_branch(use_obj_undelim)
-    aliases = get_use_package_items(use_obj_delim, "alias")
-    env_vars = get_use_package_items(use_obj_delim, "env")
-    path_prepends = get_use_package_path_appends(use_obj_delim, True)
-    path_postpends = get_use_package_path_appends(use_obj_delim, False)
-    use_scripts = get_use_package_use_scripts(use_obj_undelim)
-    unuse_scripts = get_use_package_unuse_scripts(use_obj_undelim)
-    use_cmds = get_use_package_use_cmds(use_obj_undelim)
-    unuse_cmds = get_use_package_unuse_cmds(use_obj_undelim)
+    subs = get_built_in_vars(use_pkg_file, settings["auto_version_offset"])
 
-    # Validate the permissions of the use and unuse scripts.
-    if ENFORCE_CALLED_SCRIPT_PERMISSIONS:
-        for script in use_scripts:
-            if not validate_permissions(script[0], LEGAL_PERMISSIONS):
-                handle_permission_violation(script[0])
-        for script in unuse_scripts:
-            if not validate_permissions(script[0], LEGAL_PERMISSIONS):
-                handle_permission_violation(script[0])
+    branch = get_use_package_item_list(use_obj, "branch", subs)[0]
+    aliases = get_use_package_key_value_pairs(use_obj, "alias", subs)
+    env_vars = get_use_package_key_value_pairs(use_obj, "env", subs)
+    path_prepends = get_use_package_path_appends(use_obj, subs, True)
+    path_postpends = get_use_package_path_appends(use_obj, subs, False)
+    use_scripts = get_use_package_item_list(use_obj, "use_scripts", subs)
+    unuse_scripts = get_use_package_item_list(use_obj, "unuse_scripts", subs)
+    use_cmds = get_use_package_item_list(use_obj, "use_cmds", subs)
+    unuse_cmds = get_use_package_item_list(use_obj, "unuse_cmds", subs)
 
-    # Unuse the previous version of this package (if it exists)
-    try:
-        history_file = os.environ[USE_PKG_HISTORY_FILE_ENV]
-    except KeyError:
-        history_file = None
+    prev_use_pkg = historical_use_pkg_from_branch(branch)
+    if prev_use_pkg:
+        unuse(prev_use_pkg, raw_aliases)
 
-    # Open the history file as a configparser object and remove the previous
-    # instance of this same branch.
-    if history_file:
+    shell_cmds = list()
 
-        hist_obj = configparser.ConfigParser()
-        hist_obj.read(history_file)
+    for alias in aliases.keys():
+        shell_cmds.append(shell.format_alias(alias, aliases[alias]))
 
-        if hist_obj.has_section(branch):
-            use_pkg_name = hist_obj.get(branch, "name")
-            unuse(use_pkg_name, raw_aliases)
+    for env_var in env_vars.keys():
+        shell_cmds.append(shell.format_env(env_var, env_vars[env_var]))
 
-    substitutions = get_built_in_vars(use_pkg_file,
-                                      settings["auto_version_offset"])
+    path_var_names = list(path_prepends.keys())
+    path_var_names.extend(path_postpends.keys())
+    path_var_names = list(set(path_var_names))
+    for path_var_name in path_var_names:
+        try:
+            prepends = path_prepends[path_var_name].copy()
+        except KeyError:
+            prepends = list()
+        try:
+            postpends = path_postpends[path_var_name]
+        except KeyError:
+            postpends = list()
+        postpends = [path for path in postpends if path not in prepends]
+        try:
+            existing = os.environ[path_var_name].split(":")
+        except KeyError:
+            existing = list()
+        remaining = [path for path in existing if path not in prepends]
+        remaining = [path for path in remaining if path not in postpends]
+        prepends.extend(remaining)
+        prepends.extend(postpends)
+        shell_cmds.append(shell.format_path_var(path_var_name, prepends))
 
-    # Extract the data from the package file and reformat it into a series of
-    # bash shell commands that will be passed back as a single, semi-colon
-    # delimited command.
-    bash_cmd = list()
-    bash_cmd.append(format_aliases_for_shell(aliases, substitutions))
-    bash_cmd.append(format_env_vars_for_shell(env_vars, substitutions))
-    bash_cmd.append(format_paths_for_shell(path_prepends,
-                                           path_postpends,
-                                           substitutions))
-    bash_cmd.append(format_scripts_for_shell(use_scripts, substitutions))
-    bash_cmd.append(format_cmds_for_shell(use_cmds, substitutions))
-    bash_cmd = ";".join(bash_cmd)
-    while ";;" in bash_cmd:
-        bash_cmd = bash_cmd.replace(";;", ";")
-    bash_cmd = bash_cmd.strip(";")
+    validate_script_permissions(use_scripts)
+    validate_script_permissions(unuse_scripts)
 
-    # Verify that the use scripts exist
     for use_script in use_scripts:
-        use_script = use_script[0]
-        if not os.path.exists(use_script):
-            msg = "use script: " + use_script + " does not exist. Exiting."
-            display_error(msg)
-            sys.exit(1)
+        shell_cmds.append(use_script)
 
-    # Verify that the unuse scripts exist
-    for unuse_script in unuse_scripts:
-        unuse_script = unuse_script[0]
-        if not os.path.exists(unuse_script):
-            msg = "unuse script: " + unuse_script + " does not exist. Exiting."
-            display_error(msg)
-            sys.exit(1)
+    for use_cmd in use_cmds:
+        shell_cmds.append(use_cmd)
 
-    # Verify the use scripts and unuse scripts have the correct permissions
-    if ENFORCE_APP_PERMISSIONS:
-        for use_script in use_scripts:
-            use_script = use_script[0]
-            if not validate_permissions(use_script, LEGAL_PERMISSIONS):
-                if DISPLAY_PERMISSIONS_VIOLATIONS:
-                    msg = "Script: " + use_script + " must be owned by root"
-                    msg += "and only writable by root."
-                    display_error(msg)
-                sys.exit(1)
-
-        for unuse_script in unuse_scripts:
-            unuse_script = unuse_script[0]
-            if not validate_permissions(unuse_script, LEGAL_PERMISSIONS):
-                if DISPLAY_PERMISSIONS_VIOLATIONS:
-                    msg = "Script: " + unuse_script + " must be owned by root"
-                    msg += "and only writable by root."
-                    display_error(msg)
-                sys.exit(1)
-
-    # Next we will have to build the history info. This is basically a list of
-    # what we changed, and what its previous value was so that we can
-    # potentially change it back.
-
-    # Reformat the existing aliases to be a dictionary
     existing_aliases = format_existing_aliases(raw_aliases)
-
-    # Get a list of aliases in the current shell that match those being reset
     modified_aliases = get_matching_aliases(aliases, existing_aliases)
-
-    # Get a list of env vars in the current shell that match those being reset
     modified_env_vars = get_matching_env_vars(env_vars)
-
-    # Get a list of existing paths that match those being changed.
     modified_path_vars = get_matching_paths(path_prepends, path_postpends)
 
-    # Write out the history
     write_history(use_pkg_name=use_pkg_name,
                   use_pkg_file=use_pkg_file,
                   branch=branch,
@@ -1447,9 +1052,12 @@ def use(use_pkg_name, raw_aliases):
                   modified_env_vars=modified_env_vars,
                   modified_path_vars=modified_path_vars)
 
-    # Export the bash command
-    export_shell_command(bash_cmd)
+    shell.export_shell_command(shell_cmds)
 
+
+################################################################################
+# USED
+################################################################################
 
 # ------------------------------------------------------------------------------
 def get_used():
@@ -1483,10 +1091,13 @@ def used():
     """
 
     used_pkg_names = get_used()
+    cmd = ['printf "' + r'\n'.join(used_pkg_names) + r'\n' + '"']
+    shell.export_shell_command(cmd)
 
-    # Export the shell command to display these items
-    export_shell_command('printf "' + r'\n'.join(used_pkg_names) + r'\n' + '"')
 
+################################################################################
+# UNUSE
+################################################################################
 
 # ------------------------------------------------------------------------------
 def unuse_aliases(hist_obj,
@@ -1524,7 +1135,7 @@ def unuse_aliases(hist_obj,
              unset the aliases that were set by the use command.
     """
 
-    output = list()
+    shell_cmd = list()
 
     # Format the existing aliases into key/value tuples
     shell_aliases = format_existing_aliases(raw_aliases)
@@ -1564,14 +1175,14 @@ def unuse_aliases(hist_obj,
 
         # If the alias does not exist in the prev_aliases, unset the alias.
         if alias not in prev_aliases.keys():
-            output.append("unalias " + alias + ";")
+            shell_cmd = shell.unalias(alias)
             continue
 
         # If the alias does exist in the old_aliases, reset the alias to that
         # value.
-        output.append("alias " + alias + "='" + prev_aliases[alias] + "';")
+        shell_cmd = shell.format_alias(alias, prev_aliases[alias])
 
-    return ";".join(output)
+    return shell_cmd
 
 
 # ------------------------------------------------------------------------------
@@ -1606,7 +1217,7 @@ def unuse_env_vars(hist_obj, branch):
              unset the vars that were set by the use command.
     """
 
-    output = list()
+    shell_cmd = list()
 
     new_vars = hist_obj.get(branch, "new_env_vars")
     new_vars = ast.literal_eval(new_vars)
@@ -1643,14 +1254,14 @@ def unuse_env_vars(hist_obj, branch):
 
         # If the alias does not exist in the prev_aliases, unset the alias.
         if var not in prev_vars.keys():
-            output.append("unset " + var + ";")
+            shell_cmd = shell.unset_env_var(var)
             continue
 
         # If the alias does exist in the old_aliases, reset the alias to that
         # value.
-        output.append("export " + var + "='" + prev_vars[var] + "';")
+        shell_cmd = shell.format_env(var, prev_vars[var])
 
-    return ";".join(output)
+    return shell_cmd
 
 
 # ------------------------------------------------------------------------------
@@ -1732,7 +1343,7 @@ def unuse_paths(hist_obj,
                         unuse_paths_dict[path_var].remove(remove_path)
 
     # Now convert this into new shell commands to set the path vars
-    bash_cmd = list()
+    shell_cmd = list()
 
     for path_var in unuse_paths_dict.keys():
 
@@ -1755,13 +1366,13 @@ def unuse_paths(hist_obj,
 
         # If there are any paths left, set the variable to equal that
         if len(shell_paths) > 0:
-            bash_cmd.append("export " + path_var + "=" + ":".join(shell_paths))
+            shell_cmd = shell.format_path_var(path_var, shell_paths)
 
         # Otherwise just remove the variable completely
         else:
-            bash_cmd = ["unset " + path_var]
+            shell_cmd = shell.unset_env_var(path_var)
 
-    return ";".join(bash_cmd)
+    return shell_cmd
 
 
 # ------------------------------------------------------------------------------
@@ -1875,12 +1486,7 @@ def unuse(use_pkg_name,
     with open(os.environ[USE_PKG_HISTORY_FILE_ENV], "w") as f:
         hist_obj.write(f)
 
-    # # Export the shell command to run this command
-    cmd = ";".join(cmd)
-    while ";;" in cmd:
-        cmd = cmd.replace(";;", ";")
-    cmd = cmd.strip(";")
-    export_shell_command(cmd)
+    shell.export_shell_command(cmd)
 
 
 # ------------------------------------------------------------------------------
@@ -1893,10 +1499,12 @@ def get_prev_unuse_pkg_from_new_use_pkg(use_pkg_name):
     :return: The name of the unuse package (if one exists).
     """
 
+    # TODO: Why am I exporting empty lists?
+
     try:
         history_file = os.environ[USE_PKG_HISTORY_FILE_ENV]
     except KeyError:
-        export_shell_command("")
+        shell.export_shell_command([])
         return
 
     hist_obj = configparser.ConfigParser()
@@ -1905,22 +1513,172 @@ def get_prev_unuse_pkg_from_new_use_pkg(use_pkg_name):
     # Find the use package file from this use package name
     use_pkg_file = get_use_package_path_from_env(use_pkg_name)
     if use_pkg_file is None:
-        export_shell_command("")
+        shell.export_shell_command([])
         return
 
     # Read this use package file (both delimited and undelimited)
-    use_obj_delim, use_obj_undelim = verify_and_read_use_pkg(use_pkg_file)
+    use_obj_delim, use_obj_undelim = read_use_pkg(use_pkg_file)
 
-    # Extract the various bits of data we need from this config
-    branch = get_use_package_branch(use_obj_undelim)
+    subs = get_built_in_vars(use_pkg_file, settings["auto_version_offset"])
+
+    branch = get_use_package_item_list(use_obj_undelim, "branch", subs)
 
     # Get the unuse package name from the history file
     if not hist_obj.has_section(branch):
-        export_shell_command("")
+        shell.export_shell_command([])
         return
 
     unuse_pkg_name = hist_obj.get(branch, "name")
-    export_shell_command(unuse_pkg_name)
+    shell.export_shell_command([unuse_pkg_name])
+
+
+################################################################################
+# SETUP
+################################################################################
+
+# ------------------------------------------------------------------------------
+def evaluate_use_pkg_file(file_n,
+                          dir_n,
+                          auto_version,
+                          auto_version_offset):
+    """
+    Given a path to a file, evaluates whether it is a use pkg file or not. If it
+    is, returns a tuple containing the use package name (including version, and
+    a path to this use package.
+
+    :param file_n: A path to a file.
+    :param dir_n: The path where the file is located.
+    :param auto_version: If True, then the version number will be added just
+           before the .use. This version number will be extracted from the
+           path. It will be added in the format: "-<version>". For example:
+           clarisse.use would become clarisse-3.6sp7.use (where the version is
+           "3.7sp7"). This will also auto-add a "latest" version that is based
+           on a sort of available versions and points to the highest version.
+    :param auto_version_offset: The offset that indicates which parent directory
+           defines the version number. 1 = use package directory. 2 = parent
+           of use package directory, 3 = grandparent, etc.
+
+    :return: A tuple where the first element is the name of the use package
+             (munged to include the version number if auto_version is true),
+             and the second value is the path to the use package. If the file
+             is not a valid use package, returns None.
+    """
+
+    if file_n.endswith(".use"):
+        full_p = os.path.join(dir_n, file_n)
+        if auto_version:
+            version = get_version(full_p,
+                                  auto_version_offset)
+            file_n = os.path.splitext(file_n)[0]
+            file_n += "-" + version + os.path.splitext(file_n)[1]
+        else:
+            file_n = os.path.splitext(file_n)[0]
+        if ENFORCE_USE_PKG_PERMISSIONS:
+            if not validate_permissions(full_p, LEGAL_PERMISSIONS):
+                return None
+        return file_n, full_p
+    return None
+
+
+# ------------------------------------------------------------------------------
+def find_all_use_pkg_files(search_paths,
+                           auto_version,
+                           auto_version_offset,
+                           recursive):
+    """
+    Finds all of the use packages:
+
+    :param search_paths: A list of paths where the use packages could live.
+    :param auto_version: If True, then the version number will be added just
+           before the .use. This version number will be extracted from the
+           path. It will be added in the format: "-<version>". For example:
+           clarisse.use would become clarisse-3.6sp7.use (where the version is
+           "3.6sp7").
+    :param auto_version_offset: The offset that indicates which parent directory
+           defines the version number. 1 = use package directory. 2 = parent
+           of use package directory, 3 = grandparent, etc.
+    :param recursive: If true, then all sub-dirs of the search paths will be
+           traversed as well.
+
+    :return: A dictionary of use package file names where the key is the name
+             of the use package, and the value is the full path to this use
+             package.
+    """
+
+    use_pkg_files = dict()
+    for search_path in search_paths:
+        if os.path.exists(search_path) and os.path.isdir(search_path):
+            if recursive:
+                for dir_n, dirs_n, files_n in os.walk(search_path):
+                    for file_n in files_n:
+                        result = evaluate_use_pkg_file(file_n,
+                                                       dir_n,
+                                                       auto_version,
+                                                       auto_version_offset)
+                        if result:
+                            use_pkg_files[result[0]] = result[1]
+
+            else:
+                files_n = os.listdir(search_path)
+                for file_n in files_n:
+                    result = evaluate_use_pkg_file(file_n,
+                                                   search_path,
+                                                   auto_version,
+                                                   auto_version_offset)
+                    if result:
+                        use_pkg_files[result[0]] = result[1]
+
+    return use_pkg_files
+
+
+# ------------------------------------------------------------------------------
+def cmd_to_write_use_pkgs_to_env(av_search_paths,
+                                 bv_search_paths,
+                                 auto_version_offset,
+                                 recursive):
+    """
+    Finds all of the use packages and writes their names to an env var called
+    "USE_AVAILABLE_PACKAGES" in the format:
+
+    name1@path1:name2@path2:...:nameN@pathN
+
+
+    :param av_search_paths: A list of paths where the auto version use packages
+           could live.
+    :param bv_search_paths: A list of paths where the baked version use packages
+           could live.
+    :param auto_version_offset: The offset that indicates which parent directory
+           defines the version number. 1 = use package directory. 2 = parent
+           of use package directory, 3 = grandparent, etc.
+    :param recursive: If true, then all sub-dirs of the search paths will be
+           traversed as well.
+
+    :return: A string that is the bash shell command to create the env var.
+    """
+
+    use_pkg_files = list()
+    av_use_pkgs = find_all_use_pkg_files(av_search_paths,
+                                         True,
+                                         auto_version_offset,
+                                         recursive)
+
+    bv_use_pkgs = find_all_use_pkg_files(bv_search_paths,
+                                         False,
+                                         0,
+                                         recursive)
+
+    for key in bv_use_pkgs.keys():
+        if key not in av_use_pkgs.keys():
+            av_use_pkgs[key] = bv_use_pkgs[key]
+
+    for use_pkg in av_use_pkgs.keys():
+        use_pkg_files.append(use_pkg + "@" + av_use_pkgs[use_pkg])
+
+    output = shell.format_path_var(USE_PKG_AVAILABLE_PACKAGES_ENV,
+                                   use_pkg_files)
+    # output = ":".join(use_pkg_files)
+    # output = "export " + USE_PKG_AVAILABLE_PACKAGES_ENV + "=" + output
+    return output
 
 
 # ------------------------------------------------------------------------------
@@ -1934,6 +1692,8 @@ def setup():
              session.
     """
 
+    output = list()
+
     # Check to see if there is already a use history file for this shell.
     # Create one if needed.
     try:
@@ -1942,7 +1702,8 @@ def setup():
         f, use_history_file = tempfile.mkstemp(suffix=".usehistory", text=True)
 
     # Store this file name in the form of an environmental variable.
-    output = "export " + USE_PKG_HISTORY_FILE_ENV + "=" + use_history_file
+    output.append(shell.format_env(USE_PKG_HISTORY_FILE_ENV, use_history_file))
+    # output = "export " + USE_PKG_HISTORY_FILE_ENV + "=" + use_history_file
 
     legal_path_found = False
     for path in settings["pkg_av_search_paths"]:
@@ -1960,26 +1721,32 @@ def setup():
         sys.exit(1)
 
     # Store the auto version use package search paths
-    output += ";export " + USE_PKG_AV_SEARCH_PATHS_ENV
-    output += "=" + ":".join(settings["pkg_av_search_paths"])
+    output.append(shell.format_path_var(USE_PKG_AV_SEARCH_PATHS_ENV,
+                                        settings["pkg_av_search_paths"]))
+    # output += ";export " + USE_PKG_AV_SEARCH_PATHS_ENV
+    # output += "=" + ":".join(settings["pkg_av_search_paths"])
 
     # Store the baked version use package search paths
-    output += ";export " + USE_PKG_BV_SEARCH_PATHS_ENV
-    output += "=" + ":".join(settings["pkg_bv_search_paths"])
+    output.append(shell.format_path_var(USE_PKG_BV_SEARCH_PATHS_ENV,
+                                        settings["pkg_bv_search_paths"]))
+    # output += ";export " + USE_PKG_BV_SEARCH_PATHS_ENV
+    # output += "=" + ":".join(settings["pkg_bv_search_paths"])
 
     # Save the existing use packages to an env var
-    output += ";"
-    output += cmd_to_write_use_pkg_files_to_env(settings["pkg_av_search_paths"],
-                                                settings["pkg_bv_search_paths"],
-                                                settings["auto_version_offset"],
-                                                settings["do_recursive_search"])
+    # output += ";"
+    output.append(cmd_to_write_use_pkgs_to_env(settings["pkg_av_search_paths"],
+                                               settings["pkg_bv_search_paths"],
+                                               settings["auto_version_offset"],
+                                               settings["do_recursive_search"]))
 
     # Export these env variables.
-    export_shell_command(output)
+    shell.export_shell_command(output)
 
 
-# ==============================================================================
-# ==============================================================================
+################################################################################
+# MAIN
+################################################################################
+
 if __name__ == "__main__":
 
     # Make sure this script is owned by root and only writable by root.
@@ -1988,57 +1755,67 @@ if __name__ == "__main__":
                                     LEGAL_PERMISSIONS):
             handle_permission_violation(os.path.abspath(__file__))
 
-    # Only handle specific types of requests
-    if sys.argv[1] not in LEGAL_COMMANDS:
-        display_error("Unknown command: " + sys.argv[1])
+    # Only handle specific types of shells
+    if sys.argv[1] not in LEGAL_SHELLS:
+        display_error("Unknown shell: " + sys.argv[1])
         display_usage()
         sys.exit(1)
+
+    # Only handle specific types of requests
+    if sys.argv[2] not in LEGAL_COMMANDS:
+        display_error("Unknown command: " + sys.argv[2])
+        display_usage()
+        sys.exit(1)
+
+    # Import the appropriate shell library
+    if sys.argv[1] == "bash":
+        import bash as shell
 
     # Read the env and stuff its settings into the constants
     settings = read_user_settings_from_env()
 
     # SETUP
     # ===========================
-    if sys.argv[1] == "setup":
+    if sys.argv[2] == "setup":
         setup()
         sys.exit(0)
 
     # ===========================
-    if sys.argv[1] == "refresh":
+    if sys.argv[2] == "refresh":
         setup()
         sys.exit(0)
 
     # ===========================
-    if sys.argv[1] == "unuse_package_from_use_package":
+    if sys.argv[2] == "unuse_package_from_use_package":
         get_prev_unuse_pkg_from_new_use_pkg(sys.argv[2])
 
     # ===========================
-    if sys.argv[1] == "complete_use":
-        complete_use(sys.argv[2])
+    if sys.argv[2] == "complete_use":
+        complete_use(sys.argv[3])
 
     # ===========================
-    if sys.argv[1] == "complete_unuse":
-        complete_unuse(sys.argv[2])
+    if sys.argv[2] == "complete_unuse":
+        complete_unuse(sys.argv[3])
 
     # ===========================
-    if sys.argv[1] == "use":
-        if len(sys.argv) != 3:
+    if sys.argv[2] == "use":
+        if len(sys.argv) != 4:
             display_error("use: Wrong number of arguments.")
             sys.exit(1)
         stdin = list(sys.stdin)
-        use(sys.argv[2], stdin)
+        use(sys.argv[3], stdin)
 
     # ===========================
-    if sys.argv[1] == "used":
+    if sys.argv[2] == "used":
         used()
 
     # ===========================
-    if sys.argv[1] == "unuse":
+    if sys.argv[2] == "unuse":
         stdin = list(sys.stdin)
-        if len(sys.argv) > 2:
-            unuse(sys.argv[2], stdin)
+        if len(sys.argv) > 3:
+            unuse(sys.argv[3], stdin)
 
     # ===========================
     # Just for debugging.
-    if sys.argv[1] == "test":
+    if sys.argv[2] == "test":
         pass
