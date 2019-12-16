@@ -113,6 +113,7 @@ In addition to the previously mentioned "use" command, there are also the follow
 ---
 # Under the hood
 ###use_bash.sh and use.py
+
 All of the use commands are handled by a single shell script: use_bash.sh.  This shell script accepts the individual commands (use, unuse, used, setup) as command line arguments.  The shell script also handles tab-completion (the user merely has to type the first few letters of a use package name and a list of matching packages will be displayed). The shell script is only responsible for handing the use request off to a python script (use.py) which does the actual processing. This python script then returns a bash command in the form of a string which the shell script then executes.
 
 The actual use_bash.sh command cannot be executed in the normal way. It must actualy be sourced in order for the system to work (i.e `source use_bash.sh`).  This is made easier by the "setup" command which creates three alias' in the current shell that automatically source the use_bash.sh script and include the necessary command line arguments. These alias' are: "use", "unuse", and "used".
