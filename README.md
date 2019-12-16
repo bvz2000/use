@@ -123,13 +123,13 @@ The setup command MUST be run once for each shell where you intend to invoke the
 `source /opt/scripts/use_bash.sh setup`
  
 --
-###Use Packages
+### Use Packages
 The use system end user data (the custom environments the end user wishes to manage) is comprised of small text files that end in ".use" (also known as 'use packages').
 
 One of these files must exist for every version of every application or library or environment you wish to be manged by the use system. 
 
 #
-###Use Package Search Paths
+### Use Package Search Paths
 
 The use system uses search paths to identify where to look for these use packages.  As such, these .use files must live somewhere in one of these search paths.
 There are TWO types of search paths:
@@ -149,7 +149,7 @@ You may modify or add to these paths through the use of specific environmental v
 Note: The actual applications and libraries that are managed by these use packages may live *anywhere* on the system or network. I have a preferred setup which I describe below, but the actual structure of where use packages and the files they represent is completely free-form. This means you may place the .use files anywhere on your network that you find suitable (as long as you include these locations in the search paths). Your applications, tools, libraries, and other items that are managed by these use packages may be anywhere on your network as well (and do *not* need to be added to any search paths in order for the use system to work).
 
 #
-###Use Package Format
+### Use Package Format
 Individual .use files (use packages) are formatted as a standard, windows-style .ini file. 
 
 The following is an example use package file. Note that normally you would not set one up with all of the contents being shown here. This example is over-provisioned simply to show what kinds of options are available. Lower down in this document I show some more common examples of use packages.
@@ -240,7 +240,7 @@ unuse blender_tools-v1.0.1
   - Identical to the use-cmds section, except these commands are executed during the unuse process.
 
 #
-###Built in Variables
+### Built in Variables
 
 Use packages have access to a number of built in variables.
 
@@ -269,19 +269,19 @@ They may be used in any section of the .use file: [env], [alias], [path-prepend]
 ### Environmental Variables
 The use system understands the following environmental variables that can modify how the use system itself works. These variables are optional, but if they are used, must be set in the shell where the end user is invoking the use command:
 
-#####USE_PKG_AUTO_VER_SEARCH_PATHS
+##### USE_PKG_AUTO_VER_SEARCH_PATHS
 
 This is a list of paths where the system will look for use packages that it will auto-version. Defaults to `/opt/apps/`
 
-#####USE_PKG_BAKED_VER_SEARCH_PATHS
+##### USE_PKG_BAKED_VER_SEARCH_PATHS
 
 This is a list of paths where the system will look for use packages that have versions baked into their names. Defaults to `/opt/use/`
 
-#####USE_PKG_SEARCH_RECURSIVE
+##### USE_PKG_SEARCH_RECURSIVE
 
 A boolean determining whether to search sub-directories of the paths listed above. If False, then only the directories listed above (and none of their sub-directoreis) will be searched. If this environment variable is not set, defaults to `True`.
 
-#####USE_PKG_AUTO_VERSION_OFFSET
+##### USE_PKG_AUTO_VERSION_OFFSET
 
 Where in the path to look for the version number given as an offset from the location of the use package. For example, if the path to the use package is:
 
@@ -289,16 +289,16 @@ Where in the path to look for the version number given as an offset from the loc
 
 then you would want to set the offset to 2, meaning it would look up the hierarchy by two levels and find `v001`. If this environment variable is not set, defaults to `2`.
 
-#####USE_PKG_PACKAGES
+##### USE_PKG_PACKAGES
 
 This is a system variable that stores all of the use packages that were found on all of the search paths for the current shell. Do not modify this variable by hand.
 
-#####USE_PKG_HISTORY_FILE
+##### USE_PKG_HISTORY_FILE
 
 This is a system variable that stores the path to a temporary file that contains the history of use commands in the current shell. It is used to perform a smart 'unuse'. Do not modify this variable nor the linked file by hand.
 
 #
-###Versioning (auto versions and baked versions)
+### Versioning (auto versions and baked versions)
 
 Each use package typically has a version attached to it (this is not strictly necessary and there may be cases in which you do not wish to include versions, but these cases are less common).
 
@@ -333,7 +333,7 @@ Use packages that are auto-versioned must live somewhere in the auto-version sea
 There is no difference in the internal structure of an auto-versioned use package and a baked version use package. Their distinction is purely a result of which search path they live in.
 
 #
-###Auto Versioning Details:
+### Auto Versioning Details:
 
 The easiest (and most flexible way) to handle versioning is to let the system auto-manage versions. In this case the version numbers are derived from the location of a use package (the version is extracted from the path to the use package).
 
@@ -354,7 +354,7 @@ The system uses an environmental variable called `USE_PKG_AUTO_VERSION_OFFSET` t
   then two steps up would be `4.0sp4`.
 
 #
-###Baked Versioning Details:
+### Baked Versioning Details:
 
 The second way versions are handled is by simply baking the version number into the use package name itself (or foregoing versions all together).
 
@@ -368,11 +368,11 @@ Essentially, baked versions are simply version numbers that are baked into the u
 
 ---
 
-#How I manage my apps (real world use cases)
+# How I manage my apps (real world use cases)
 
 The following section gives a few different scenarios on how one could format the use packages and the directories where these use packages are stored. 
 
-###My directory structure
+### My directory structure
 
 Note: This is just an example of how you can manage your applications. You may use ***ANY*** organizational structure that works for you.
 
@@ -436,12 +436,12 @@ $VERSION_PATH/app/shelves/shelf.cfg
 
 Notice the use of the built in variables like $VERSION_PATH and $USE_PKG_PATH that make this .use file relocatable. In other words, when A new version of Clarisse is released, I merely need to copy this .use file to the new wrapper directory and it will automatically work with the new version.
 
-###Switching between multiple versions of the same app
+### Switching between multiple versions of the same app
 
 TODO!!!
 
 ---
-#A note about security:
+# A note about security:
 
 Some very minor steps have been taken to provide a modest amount of security. The use.py application itself will refuse to run if it is not owned by root and not only writable by root (to prevent tampering with the source code). It will also only run executables (in the use-scripts and unuse-scripts sections) if they are owned by root and only writable by root. This prevents someone from surreptitiously changing the contents of a script being called by the use system and tricking the user into running malicious code. Similarly, use package files will only be processed if they have the same limitations (owned by root and only writable by root) to prevent someone from injecting another command into the use system without the end user being aware of it. 
 
@@ -458,7 +458,7 @@ Along these lines, if these security settings are too restrictive, the source co
 
 What follows are two specific use cases for the use system. There are a myriad of other ways it can be used, but these two represent a cross section of what I think are the most likely common scenarios.
 
-###Case #1: Easily Running Multiple Versions of the Same Application:
+### Case #1: Easily Running Multiple Versions of the Same Application:
 Let's assume you want to have more than one version of Blender running on your system, and you want to be able to quickly switch from one to the other.
 
 Start by installing Blender to a location of your choosing. For my purposes I will always install all of my applications to /opt/. I use the following structure:
@@ -509,7 +509,7 @@ Now when you type `use bl` and hit tab, you will be presented with two options: 
 Now you could continue this same pattern for every beta version of Blender too. In a shell you can easily choose which one you want to 'use' simply by typing `use blender-<version>`. Feel free to have 100 different versions on your system without any concern that they will interfere with each other.
 
 Note: the directory structure I indicated above is just how I set up my own system. The use system is quite free-form with regard to where .use files are stored and where the applications they relate to are stored. They do not have to be in the same hierarchy at all. That is just how I like to mange my system.
-###Case #2: Using different libraries on the same system:
+### Case #2: Using different libraries on the same system:
 Say you want to have different versions of a python package for different purposes. For example, perhaps you are developing a tool and you want users on your network to be able to use the latest released library, but you yourself want to use the development version. This is also easy to accomplish using the use packages.
 
 Create two .use packages (if you are using the auto-versioning system they will have to be in separate directories).
@@ -552,7 +552,7 @@ In this way it is easy to have multiple versions of python packages ready, and y
 
 This may seem to duplicate the functionality of Python's virtual environments. In reality, you would probably just use virtual environments, but call them from this use package. That leverages the power of the virtual environments, but wraps it up in a package that can also set enviro
 
-###Other examples:
+### Other examples:
 These are not the only two use cases. use packages can modify environmental variables, change path variables, set aliases, run shell commands, define .desktop files (not yet implemented), and even run arbitrary scripts when called.
 
 Basically any changes you need to make to your shell environment prior to running an application or doing any work can be included in a .use package.
@@ -566,7 +566,7 @@ It really is the cat's meow. :)
 ---
 
 ---
-#FAQ:
+# FAQ:
 
 - Didn't you just create a less good version of Python's virtual environments?
 
