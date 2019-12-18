@@ -116,7 +116,7 @@ In addition to the previously mentioned "use" command, there are also the follow
 
 All of the use commands are handled by a single shell script: use_bash.sh.  This shell script accepts the individual commands (use, unuse, used, setup) as command line arguments.  The shell script also handles tab-completion (the user merely has to type the first few letters of a use package name and a list of matching packages will be displayed). The shell script is only responsible for handing the use request off to a python script (use.py) which does the actual processing. This python script then returns a bash command in the form of a string which the shell script then executes.
 
-The actual use_bash.sh command cannot be executed in the normal way. It must actualy be sourced in order for the system to work (i.e `source use_bash.sh`).  This is made easier by the "setup" command which creates three alias' in the current shell that automatically source the use_bash.sh script and include the necessary command line arguments. These alias' are: "use", "unuse", and "used".
+The actual use_bash.sh command cannot be executed in the normal way. It must actually be sourced in order for the system to work (i.e `source use_bash.sh`).  This is made easier by the "setup" command which creates three alias' in the current shell that automatically source the use_bash.sh script and include the necessary command line arguments. These alias' are: "use", "unuse", and "used".
 
 The setup command MUST be run once for each shell where you intend to invoke the use or unuse commands. Since this would be annoying to have to remember to type each time you create a new shell, it is recommended that you add the following command to your .bashrc file (this particular example assumes you unzipped the downloaded files to `/opt/scripts`, but you may actually install the use system anywhere on your system you deem fit. Adjust the following line to the path where you unzipped the downloaded files):
 
@@ -279,7 +279,7 @@ This is a list of paths where the system will look for use packages that have ve
 
 ##### USE_PKG_SEARCH_RECURSIVE
 
-A boolean determining whether to search sub-directories of the paths listed above. If False, then only the directories listed above (and none of their sub-directoreis) will be searched. If this environment variable is not set, defaults to `True`.
+A boolean determining whether to search sub-directories of the paths listed above. If False, then only the directories listed above (and none of their sub-directories) will be searched. If this environment variable is not set, defaults to `True`.
 
 ##### USE_PKG_AUTO_VERSION_OFFSET
 
@@ -531,7 +531,7 @@ Some very minor steps have been taken to provide a modest amount of security. Th
 
 That said, Any commands listed in the use-cmds and unuse-cmds section are not validated in the same way. Normally these sections should be used to run fairly innocent commands (like setting a python virtual environment). But note that even these seemingly innocuous commands could be hijacked and provide an avenue for malicious behavior. So calibrate your risk aversion accordingly.
 
-These security precautions are generally used to prevent casual tampering with the use system, and are probably best to leave in place. They are NOT exhaustive security measures meant to prevent any and all exploits of the use system. But to be frank, if someone has gained access to your system and modified it such that the use system is now a vector for malware, you have much bigger issues to deal with. There is little that the use system can do that someone who already has access to your system couldn't do manually.
+These security precautions are generally used to prevent casual tampering with the use system, and are probably best to leave in place. They are NOT exhaustive security measures meant to prevent any and all exploits of the use system. But to be frank, if someone has gained access to your system and modified it such that the use system is now a vector for malware, you have much bigger issues to deal with. There is little that the use system can do that someone who already has access to your system could not do manually.
 
 Along these lines, if these security settings are too restrictive, the source code contains several constants at the top of the code that enables and disables these security features. You may set them to True or False to control how permission validations are performed.
 
