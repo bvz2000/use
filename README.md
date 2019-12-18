@@ -352,11 +352,11 @@ The use system understands the following environmental variables that can modify
 
 ##### USE_PKG_AUTO_VER_SEARCH_PATHS
 
-This is a list of paths where the system will look for use packages that it will auto-version. Defaults to `/opt/apps/`
+This is a list of paths where the system will look for use packages that it will auto-version. Defaults to `/opt/apps/`. Note: this path may *NOT* overlap with any of the paths in the USE_PKG_BAKED_VER_SEARCH_PATHS variable described below.
 
 ##### USE_PKG_BAKED_VER_SEARCH_PATHS
 
-This is a list of paths where the system will look for use packages that have versions baked into their names. Defaults to `/opt/use/`
+This is a list of paths where the system will look for use packages that have versions baked into their names. Defaults to `/opt/use/`. Note: this path may *NOT* overlap with any of the paths in the USE_PKG_AUTO_VER_SEARCH_PATHS variable described above.
 
 ##### USE_PKG_SEARCH_RECURSIVE
 
