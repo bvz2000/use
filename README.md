@@ -306,7 +306,9 @@ Use commands that have baked versions must have their versions as part of the fi
 
 Each type of versioning may be used on its own, or they can be used together. In other words, you may have some use packages that are auto-versioned and some that have baked versions.
 
-Use packages that are auto-versioned must live somewhere in the auto-version search paths. In fact, that is how they are defined to be an 'auto-version' use package. Use packages that have baked versions must live somewhere in the baked-version search paths. Again, this is how they are defined to be a baked-version use package.
+Use packages that are auto-versioned **MUST** live somewhere in the auto-version search paths. In fact, that is how they are defined to be an 'auto-version' use package. 
+
+Use packages that have baked versions **MUST** live somewhere in the baked-version search paths. Again, this is how they are defined to be a baked-version use package.
 
 There is no difference in the internal structure of an auto-versioned use package and a baked version use package. Their distinction is purely a result of which search path they live in.
 
