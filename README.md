@@ -528,6 +528,10 @@ I set an env variable called OCIO_CONFIG_PATH which controls where to find the O
 
 I use the [use-cmds] section to load additional use packages. So by running the show's use package, I can quickly load many additional use packages. Later, when you unuse the show, all of these sub-packages will also be unused.
 
+I can also manually unuse any of these used packages one by one if needed.
+
+A list of all currently used packages, whether manually used in a shell, or auto-used from another use package can be displayed by typing: `use`.
+
 ### Auto-using use packages.
 
 Manually typing in a bunch of use commands in each shell every time you create a new shell can be a bother.
