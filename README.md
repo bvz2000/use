@@ -322,13 +322,13 @@ Versioning is split into two different types. These types are:
 - auto-versioning
 - baked-versioning
 
-Use commands that are auto-versioned will, as the name suggests, have their version numbers automatically added to the use package name. For example, a use package file stored within the auto-version search path that is named `blender.use` could actually be presented to the user as `blender-2.80.use`. The mechanism by which this happens is explained in greater detail below.
+Use commands that are auto-versioned will, as the name suggests, have their version numbers automatically added to the use package name. For example, a use package file stored within the auto-version search path that is named `blender.use` could actually be presented to the user as `blender-2.80` (the '.use' extension is hidden from the user). The mechanism by which this happens is explained in greater detail below.
 
 Use commands that have baked versions must have their versions as part of the file name. For example, a use package file stored within the baked-version search path that is named `blender.use` would be presented to the user exactly as it is named, and without any version (i.e. `blender`). If you want this use package to actually have a version, you need to make the version a part of the use package file name. In other words, if you wanted the version to be `2.80`, then the .use file would have to be named: `blender-2.80.use`.
 
 Each type of versioning may be used on its own, or they can be used together. In other words, you may have some use packages that are auto-versioned and some that have baked versions.
 
-Use packages that are auto-versioned must live somewhere in the auto-version search paths. In fact, that is how they are defined to be an 'auto-version' use package. Use packages that have baked versions must live somewhere in the baked-version search paths. Again, this is how they are defined to be baked-version use package.
+Use packages that are auto-versioned must live somewhere in the auto-version search paths. In fact, that is how they are defined to be an 'auto-version' use package. Use packages that have baked versions must live somewhere in the baked-version search paths. Again, this is how they are defined to be a baked-version use package.
 
 There is no difference in the internal structure of an auto-versioned use package and a baked version use package. Their distinction is purely a result of which search path they live in.
 
@@ -351,18 +351,18 @@ The system uses an environmental variable called `USE_PKG_AUTO_VERSION_OFFSET` t
 
   `/opt/apps/isotropix/clarisse/4.0sp4/wrapper/clarisse.use`
 
-  then two steps up would be `4.0sp4`.
+  then the version (read from the path two steps up from the use package) would be `4.0sp4`, and the use package would be presented to the user as `clarisse-4.0sp4`.
 
 #
 ### Baked Versioning Details:
 
 The second way versions are handled is by simply baking the version number into the use package name itself (or foregoing versions all together).
 
-For example, if you want to create a use package for maya 2018.3 via a baked use package, you would create a use file named `maya-2018.3.use`. This file *must* reside in a path that is part of the baked-versions search paths.
+For example, if you want to create a use package for maya 2018.3 via a baked use package, you would create a use file named `maya-2018.3.use`. Note: this file *must* reside in a path that is part of the baked-versions search paths. That is: a) how the use package will be found, and b) how it will be defined as a baked version use package. This use package will then be presented to the user as `maya-2018.3`.
 
-Then, if you wanted to have a use package for maya 2018.4, then you would create another file named `maya-2018.4.use`. Again, this file must reside in a baked-versions search path.
+If you wanted to have a use package for maya 2018.4, you would create another file named `maya-2018.4.use`. Again, this file must reside in a baked-versions search path. It would be presented to the user as `maya-2018.3`.
 
-Along those lines, if you wanted a use package that does not use versions, you would simply create a use package named `maya.use`.
+Along those lines, if you wanted a use package that does not use versions, you would simply create a use package named `maya.use`. It would be presented to the user as `maya`.
 
 Essentially, baked versions are simply version numbers that are baked into the use package names.
 
@@ -374,41 +374,42 @@ The following section gives a few different scenarios on how one could format th
 
 ### My directory structure
 
-Note: This is just an example of how you can manage your applications. You may use ***ANY*** organizational structure that works for you.
+Let's start with how I manage my directory structure. Note: This is just an example of how you can manage your directories. You may use ***ANY*** directory structure that works for you.
 
 I store all of my applications and some specific libraries in 
 
 `/opt/apps/[vendor]/[appname]/[version]`
 
-For example, clarisse version 4.0-sp3 would be stored in a directory:
+For example, Clarisse version 4.0-sp3 (A 3D content creation app from a company called Isotropix) would be stored in a directory:
 
 `/opt/apps/isotropix/clarisse/4.0sp3/`
 
-And clarisse version 4.0-sp4 would be stored in:
+And Clarisse version 4.0-sp4 would be stored in:
 
 `/opt/apps/isotropix/clarisse/4.0sp4/`
 
-Within each of these directories I create two sub-directories. The first is named 'app', and the second is named 'wrapper'. 
+Within the directories I described above, I create two sub-directories. The first is named 'app', and the second is named 'wrapper'. 
 
 'app' contains the application files as supplied by the vendor. I do my best never to make any modifications to these files, though sometimes it is unavoidable.
 
-'wrapper' contains the .use package file (`clarisse.use` in this example), and any additional files needed to run the app on my particular version of Linux (Manjaro at the time of this writing). Specifically, since the application Clarisse was designed to run under CentOS, I need to install some custom libraries that I extracted from a CentOS installation. Since I will also need to modify the LD_LIBRARY_PATH to reference these libraries, I will need a wrapper shell to actually set the LD_LIBRARY_PATH env variable (and launch Clarisse).
+'wrapper' contains the .use package file (`clarisse.use` in this example), and any additional, custom files needed to run the app on my particular system. Since the specific flavor of Linux I am running (Manjaro at the time of this writing) is not certified for use with Clarisse, I need to install some custom libraries that I extracted from a CentOS installation. These are needed to run Clarisse on my system and, as such, will live in a lib directory inside of the wrapper directory. Launching Clarisse requires a few additional steps be taken at each run, so the actual app is wrapped in a shell script (also in the wrapper directory) called `clarisse.sh`.
 
-So, specifically, I construct the following structure (Note: this is a particularly complex example of a wrapper directory. Most do not require as much as this):
+To accomplish all of this, the wrapper directory contains the following (Note: this is a more complex example of a wrapper directory than is usual. Many wrapper directories consist of nothing more than the .use package file itself):
 
 ```
-opt
-   apps
-      isotropix
-         clarisse
-            4.0sp4
-               app
-                  -- application files --
-               wrapper
-                  lib
-                     -- CentOS libraries --
-                  clarisse.use
-                  clarisse.sh
+ \  
+    \opt
+       \apps
+          \isotropix
+             \clarisse
+                \4.0sp4
+                   \app
+                        -- application files --
+                   \wrapper
+                      \lib
+                         -- CentOS libraries --
+                      clarisse.use
+                      clarisse.sh
 ```
 
 The use system itself is set up so that `/opt/apps/` is one of the auto-version search paths, and search recursively is enabled. This means that the `clarisse.use` file will be found and presented to the end user as `clarisse-4.0sp4`.
@@ -419,16 +420,8 @@ The `clarisse.use` file is as follows:
 [branch]
 clarisse
 
-[env]
-CLARISSE_HOME=$VERSION_PATH/app
-
 [alias]
 clarisse=$USE_PKG_PATH/clarisse.sh
-
-[desktop]
-desktop=$USE_PKG_PATH/clarisse.desktop
-
-[path-prepend-IX_SHELF_CONFIG_FILE]
 
 [path-postpend-IX_SHELF_CONFIG_FILE]
 $VERSION_PATH/app/shelves/shelf.cfg
@@ -436,9 +429,100 @@ $VERSION_PATH/app/shelves/shelf.cfg
 
 Notice the use of the built in variables like $VERSION_PATH and $USE_PKG_PATH that make this .use file relocatable. In other words, when A new version of Clarisse is released, I merely need to copy this .use file to the new wrapper directory and it will automatically work with the new version.
 
-### Switching between multiple versions of the same app
+Clarisse uses an environmental variable named `IX_SHELF_CONFIG_FILE` to indicate where plugin definitions are loaded. I set this path in the .use package via the [path-postpend-IX_SHELF_CONFIG_FILE] section. Now when Clarisse is launched, it will load this particular configuration file. This will become important in the next section where I discuss loading plugins for Clarisse.
 
-TODO!!!
+### Managing Different Plugins for Applications.
+
+Clarisse has a python sdk and allows the user to write scripts that are accessible from a toolbar (which they refer to as a shelf).
+
+One tool I have written is called CLAM (Which stands for **CL**arisse **A**sset **M**anagement). This is a set of python scripts that interface with another tool I have written called SQUIRREL (an asset management back end).
+
+In order to use these tools I need to add them to my system.
+
+First, I create a use package for SQUIRREL. Its contents are:
+
+```
+[branch]
+squirrel
+
+[path-prepend-PYTHONPATH]
+$VERSION_PATH/modules
+
+[path-prepend-PATH]
+$VERSION_PATH/bin
+```
+
+The branch is defined as "squirrel".
+
+I modify my PYTHONPATH to add the modules for the squirrel application (to allow me to import these in any other tools that want to make use of squirrel).
+
+I modify my PATH variable to add the bin directory of the squirrel application. As a consequence, I can then call various command line applications associated with squirrel without having to supply a full path.
+
+After squirrel, I create a another use package for CLAM. Its contents are:
+
+```ini
+[branch]
+clam
+
+[path-prepend-PYTHONPATH]
+$VERSION_PATH/modules
+
+[path-prepend-IX_SHELF_CONFIG_FILE]
+$VERSION_PATH/shelves/shelf.cfg
+```
+
+The branch is defined as "clam".
+
+I modify my PYTHONPATH to add the modules for clam (again, to allow for other tools to import these libraries.)
+
+I also modify my IX_SHELF_CONFIG_FILE path to add a path to the specific shelf configuration file for clam. Recall that in the previous section I set a default path for this path variable. That allowed me to add the default toolbars to Clarisse. By adding to this same path in this use package, I am adding a second toolbar that contains the CLAM specific tools.
+
+In this way I can add any set of additional tools to my copy of Clarisse, simply by 'using' those tools.
+
+I can also change *which* specific version of the clam tools appear in clarisse simply by "using" a different version of clam.
+
+### Other use cases.
+
+One use I have for the use system is to change "shows" when working on visual effects. Each show has a unique setup that includes setting which versions of applications to use, which versions of plugins to use for these applications, and even paths to color lookup tables among others.
+
+Setting all of these specific paths and variables and aliases can be done with a very long list of settings in a single .use file. But that would be extremely inefficient. Instead, it is possible to have one use package 'use' other use packages. In this manner, a complex set of behaviors may be created by 'ganging' up multiple, separate, smaller use packages.
+
+For example, if a show: **MYSHOW** requires a specific version of Nuke, Maya, Blender as well as specific versions of Squirrel and Clam, I would construct individual use packages for each of these. Then my use package for the show would look something like this:
+
+```bash
+[branch]
+myshow
+
+[env]
+OCIO_CONFIG_PATH=/show/myshow/color
+
+[use_cmds]
+use maya-2018.4
+use nuke-v11
+use blender-2.81
+use squirrel-1.0
+use clam-1.1
+
+[unuse_cmds]
+unuse maya-2018.4
+unuse nuke-v11
+unuse blender-2.81
+unuse squirrel-1.0
+unuse clam-1.1
+```
+The branch of this show is "myshow".
+
+I set an env variable called OCIO_CONFIG_PATH which controls where to find the Open Color IO luts. This is custom for this specific show, and so any tool that runs in the current shell will find the color luts that are appropriate for this show. If a different show specific use package were used in this or another shell, then any tools would suddenly find that show's color luts.
+
+I use the [use-cmds] section to load additional use packages. So by running the show's use package, I can quickly load many additional use packages. Later, when you unuse the show, all of these sub-packages will also be unused.
+
+### Auto-using use packages.
+
+Manually typing in a bunch of use commands in each shell every time you create a new shell can be a bother.
+
+Since I have a basic set of applications that I want to use all of the time (pycharm or chrome for example) I simply put the `use pycharm 2018.2.4` and `use chrome-79` commands directly in my .bashrc file. 
+
+In this case don't even have to type the use commands by hand. They will be available in every shell automatically.
 
 ---
 # A note about security:
@@ -451,133 +535,24 @@ These security precautions are generally used to prevent casual tampering with t
 
 Along these lines, if these security settings are too restrictive, the source code contains several constants at the top of the code that enables and disables these security features. You may set them to True or False to control how permission validations are performed.
 
----
-# TODO: MERGE THESE NEXT SECTIONS UP WITH "HOW I MANAGE MY APPS"
-
-# Specific Use Cases
-
-What follows are two specific use cases for the use system. There are a myriad of other ways it can be used, but these two represent a cross section of what I think are the most likely common scenarios.
-
-### Case #1: Easily Running Multiple Versions of the Same Application:
-Let's assume you want to have more than one version of Blender running on your system, and you want to be able to quickly switch from one to the other.
-
-Start by installing Blender to a location of your choosing. For my purposes I will always install all of my applications to /opt/. I use the following structure:
-
-/opt/apps/[vendor]/[appname]/[version]/
-
-Then within this directory I have two directories:
-
-- app
-- wrapper
-
-I store the actual application in the 'app' directory. I store any custom wrappers, custom libraries that may be referenced by LD_LIBRARY_PATH, and the .use file in the 'wrapper' directory.
-
-So in the case of Blender I would have the following structure:
-
-`/opt/apps/blender/blender/2.79/app` <- this holds the actual application files and directories
-
-`/opt/apps/blender/blender/2.79/wrapper` <- this is where the blender.use file is stored.
-
-The `blender.use` file is extremely simple and looks like this:
-
-```
-[branch]
-blender
-
-[alias]
-blender=/opt/apps/blender/blender/$VERSION/app/blender
-```
-
-Since `/opt/apps/` is in the use package search path (and recursive is True) that means this blender.use file will be found by the system. And since auto-versioning is enabled (and the offset is set to `2`) that means it will look up two levels in the directory to find its version number.
-
-So when you type `use bl` and hit `tab`, the system will auto-complete `blender-2.79` for you. Note that it has automatically added the version number (and dropped the .use).
-
-But who wants to only use Blender 2.79 now that 2.80 is out?
-
-So create some new directories:
-
-`/opt/apps/blender/blender/2.80/app`
-
-`/opt/apps/blender/blender/2.80/wrapper`
-
-In the app directory, install the 2.8 version of Blender. 
-
-In the wrapper directory just copy the .use file from 2.79. Note that since it uses the variable `$VERSION` you don't need to make any changes. It will simply work exactly as it did before. Note: There are additional built in variables (described below) which can actually simplify the structure of the use file even further.
-
-Now when you type `use bl` and hit tab, you will be presented with two options: `blender-2.79` and `blender-2.80`. Note, again, that the version numbers have been automatically added to the use packages. You did not have to customize the .use file to include them manually. Once you finish typing `blender-2.80` you may now simply type: `blender` in this shell and blender 2.8 will start up.
-
-Now you could continue this same pattern for every beta version of Blender too. In a shell you can easily choose which one you want to 'use' simply by typing `use blender-<version>`. Feel free to have 100 different versions on your system without any concern that they will interfere with each other.
-
-Note: the directory structure I indicated above is just how I set up my own system. The use system is quite free-form with regard to where .use files are stored and where the applications they relate to are stored. They do not have to be in the same hierarchy at all. That is just how I like to mange my system.
-### Case #2: Using different libraries on the same system:
-Say you want to have different versions of a python package for different purposes. For example, perhaps you are developing a tool and you want users on your network to be able to use the latest released library, but you yourself want to use the development version. This is also easy to accomplish using the use packages.
-
-Create two .use packages (if you are using the auto-versioning system they will have to be in separate directories).
-
-Say you created a tool called "mytool", and you have already released version 1.0. Create (for example) the following directory structure:
-
-`/opt/studio/packages/mytool/1.0/wrapper/` <- this is where your use package will live.
-
-`/opt/studio/packages/mytool/1.0/modules/` <- this is where your python modules will live.
-
-and
-
-`/opt/studio/packages/mytool/dev/wrapper/` <- this is where your use package for the dev version will live. Note that there is no 'modules' directory. Your source code under development can live wherever you usually store your projects.
-
-Now the use package for your released (1.0) version (in `/opt/studio/packages/mytool/1.0/wrapper/` and named `mytool.use`) of the module would (possibly) look like this:
-
-```
-[branch]
-mytool
-
-[path-prepend-PYTHONPATH]
-/opt/studio/packages/mytool/$VERSION/modules/
-```
-
-Now when you type `use mytool-1.0` your python path will have been updated to point to the 1.0 release of your python packages.
-
-But your use package for your development version (in `/opt/studio/packages/mytool/dev/wrapper/` and also named `mytool.use`) would (possibly) look like this:
-
-```
-[branch]
-mytool
-
-[path-prepend-PYTHONPATH]
-/home/me/Documents/dev/mytool/modules/
-```
-
-And when you type `use mytool-dev` your python path will have been set to point to your development version of your python packages.
-
-In this way it is easy to have multiple versions of python packages ready, and you simply 'use' the version you are interested in whenever you need to use one or the other.
-
-This may seem to duplicate the functionality of Python's virtual environments. In reality, you would probably just use virtual environments, but call them from this use package. That leverages the power of the virtual environments, but wraps it up in a package that can also set enviro
-
-### Other examples:
-These are not the only two use cases. use packages can modify environmental variables, change path variables, set aliases, run shell commands, define .desktop files (not yet implemented), and even run arbitrary scripts when called.
-
-Basically any changes you need to make to your shell environment prior to running an application or doing any work can be included in a .use package.
-
-One use I have for it is to change "shows" when working on visual effects. Each show may be using a different version of an application (say Maya 2018 for one show and Maya 2017 for another). Use packages can call other use packages (not yet fully implemented) so that I can set up a default setting for a specific show simply by calling: `use showname-1.0` and suddenly I have all the specifics for this show set in my shell, including paths to OpenColorIO config files, specific versions of tools I have coded, and any other specific changes I want to make to my system that are unique to that particular shell.
-
-I also have a basic set of applications that I want to use all of the time. Pycharm is one for example. So I simply put the `use pycharm 2018.2.4` command directly in my .bashrc file. Then I don't even have to type the use command out. I can simply type `pycharm` and it will launch the app. But if I suddenly want to try out a newer version, I can manually do that in a shell by 'using' the newer version.
-
-It really is the cat's meow. :)
-
----
 
 ---
 # FAQ:
 
 - Didn't you just create a less good version of Python's virtual environments?
 
-Kind of yes, and kind of no. But mostly no. Use packages can actually work with python virtual environments. You can switch virtual environments from directly within a use package.
+  - Kind of yes, and kind of no. But mostly no. Use packages can actually work with python virtual environments. You can switch virtual environments from directly within a use package.
 
-Use packages are sort of like python's virtual environments (or a portion thereof), but extended outside of the Python programming environment.
+  - Use packages are sort of like python's virtual environments (or a portion thereof), but extended outside of the Python programming environment.
 
 - What about using docker?
 
-Docker is a very powerful mechanism for virtualizing portions of your system. But it can be overkill and isn't really meant to be used for desktop applications. The Use system is fairly simple to set up and manage. It is intended to be easy and quick, without a lot of overhead. It merely manages different versions of applications and libraries on a simple desktop system.
+  - Docker is a very powerful mechanism for virtualizing portions of your system. But it can be overkill and isn't really meant to be used for desktop applications. The Use system is fairly simple to set up and manage. It is intended to be easy and quick, without a lot of overhead. It merely manages different versions of applications and libraries on a simple desktop system.
 
 - What are the system requirements?
 
-Use was developed under python 3, and using the Bash shell. It runs on Linux and MacOS, though there is a chance it would also work on Windows using WSL. Beyond python 3 and Bash, there are no additional dependencies.
+  - Use was developed under python 3, and using the Bash shell. It runs on Linux and MacOS, though there is a chance it would also work on Windows using WSL. Beyond python 3 and Bash, there are no additional dependencies.
+  
+- What about tcsh? zsh? Any other shells?
+
+  - The usage of the bash shell is the only one currently supported. But this connection to the calling shell is completely modular. If there were a need for additional shells, it would be relatively trivial to add that in the future.
