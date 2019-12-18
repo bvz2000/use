@@ -114,9 +114,9 @@ In addition to the previously mentioned "use" command, there are also the follow
 # Under the hood
 ### use_bash.sh and use.py
 
-All of the use commands are handled by a single shell script: use_bash.sh.  This shell script accepts the individual commands (use, unuse, used, setup) as command line arguments.  The shell script also handles tab-completion (the user merely has to type the first few letters of a use package name and a list of matching packages will be displayed). The shell script is only responsible for handing the use request off to a python script (use.py) which does the actual processing. This python script then returns a bash command in the form of a string which the shell script then executes.
+All of the use commands are handled by a single shell script: use_bash.sh.  This shell script accepts the individual commands (use, unuse, used, setup) as command line arguments.  The shell script also handles tab-completion (the user merely has to type the first few letters of a use package name, hit 'tab', and a list of matching packages will be displayed). The shell script is only responsible for handing the use request off to a python script (use.py) which does the actual processing. This python script then returns a bash command in the form of a string which the shell script then executes.
 
-The actual use_bash.sh command cannot be executed in the normal way. It must actually be sourced in order for the system to work (i.e `source use_bash.sh`).  This is made easier by the "setup" command which creates three alias' in the current shell that automatically source the use_bash.sh script and include the necessary command line arguments. These alias' are: "use", "unuse", and "used".
+The actual use_bash.sh command cannot be executed in the normal way. It must actually be sourced in order for the system to work (i.e `source use_bash.sh`).  This is so that the changes being made by this script are actually propagated into the shell in which the use command is being run. This is made easier by the "setup" command which creates three alias' in the current shell that automatically source the use_bash.sh script and include the necessary command line arguments. These alias' are: "use", "unuse", and "used".
 
 The setup command MUST be run once for each shell where you intend to invoke the use or unuse commands. Since this would be annoying to have to remember to type each time you create a new shell, it is recommended that you add the following command to your .bashrc file (this particular example assumes you unzipped the downloaded files to `/opt/scripts`, but you may actually install the use system anywhere on your system you deem fit. Adjust the following line to the path where you unzipped the downloaded files):
 
@@ -127,26 +127,6 @@ The setup command MUST be run once for each shell where you intend to invoke the
 The use system end user data (the custom environments the end user wishes to manage) is comprised of small text files that end in ".use" (also known as 'use packages').
 
 One of these files must exist for every version of every application or library or environment you wish to be manged by the use system. 
-
-#
-### Use Package Search Paths
-
-The use system uses search paths to identify where to look for these use packages.  As such, these .use files must live somewhere in one of these search paths.
-There are TWO types of search paths:
-
-- auto-version search paths
-- baked-version search paths
-
-The functionality and differences between these two types of use packages is discussed below. These two search paths have default values:
-
-- `/opt/apps` <- default path for auto-versions.
-- `opt/use` <- default path for baked versions.
-
-
-
-You may modify or add to these paths through the use of specific environmental variables (also described below).
-
-Note: The actual applications and libraries that are managed by these use packages may live *anywhere* on the system or network. I have a preferred setup which I describe below, but the actual structure of where use packages and the files they represent is completely free-form. This means you may place the .use files anywhere on your network that you find suitable (as long as you include these locations in the search paths). Your applications, tools, libraries, and other items that are managed by these use packages may be anywhere on your network as well (and do *not* need to be added to any search paths in order for the use system to work).
 
 #
 ### Use Package Format
@@ -264,6 +244,36 @@ These variables may be accessed inside a .use package file by preceding them wit
 - $VERSION_PATH
 
 They may be used in any section of the .use file: [env], [alias], [path-prepend], [path-postpend], [use-scripts], [unuse-scripts], [use-cmds], [unuse-cmds], but not in [branch]. 
+
+An example using this to set an alias for the application Blender would be:
+
+`blender=$VERSION_PATH/app/blender`
+
+This would be expanded to:
+
+`blender=/opt/apps/blender/blender/2.80/app/blender`
+
+By using these variables instead of hard-coding paths into the .use file, you make the entire use package relocatable without having to edit the .use file itself.
+
+#
+### Use Package Search Paths
+
+The use system uses search paths to identify where to look for these use packages.  As such, these .use files must live somewhere in one of these search paths.
+There are TWO types of search paths:
+
+- auto-version search paths
+- baked-version search paths
+
+The functionality and differences between these two types of use packages is discussed below. These two search paths have default values:
+
+- `/opt/apps` <- default path for auto-versions.
+- `opt/use` <- default path for baked versions.
+
+
+
+You may modify or add to these paths through the use of specific environmental variables (also described below).
+
+Note: The actual applications and libraries that are managed by these use packages may live *anywhere* on the system or network. I have a preferred setup which I describe below, but the actual structure of where use packages and the files they represent is completely free-form. This means you may place the .use files anywhere on your network that you find suitable (as long as you include these locations in the search paths). Your applications, tools, libraries, and other items that are managed by these use packages may be anywhere on your network as well (and do *not* need to be added to any search paths in order for the use system to work).
 
 #
 ### Environmental Variables
