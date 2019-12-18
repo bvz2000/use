@@ -276,38 +276,6 @@ You may modify or add to these paths through the use of specific environmental v
 Note: The actual applications and libraries that are managed by these use packages may live *anywhere* on the system or network. I have a preferred setup which I describe below, but the actual structure of where use packages and the files they represent is completely free-form. This means you may place the .use files anywhere on your network that you find suitable (as long as you include these locations in the search paths). Your applications, tools, libraries, and other items that are managed by these use packages may be anywhere on your network as well (and do *not* need to be added to any search paths in order for the use system to work).
 
 #
-### Environmental Variables
-The use system understands the following environmental variables that can modify how the use system itself works. These variables are optional, but if they are used, must be set in the shell where the end user is invoking the use command:
-
-##### USE_PKG_AUTO_VER_SEARCH_PATHS
-
-This is a list of paths where the system will look for use packages that it will auto-version. Defaults to `/opt/apps/`
-
-##### USE_PKG_BAKED_VER_SEARCH_PATHS
-
-This is a list of paths where the system will look for use packages that have versions baked into their names. Defaults to `/opt/use/`
-
-##### USE_PKG_SEARCH_RECURSIVE
-
-A boolean determining whether to search sub-directories of the paths listed above. If False, then only the directories listed above (and none of their sub-directories) will be searched. If this environment variable is not set, defaults to `True`.
-
-##### USE_PKG_AUTO_VERSION_OFFSET
-
-Only applicable to auto-versioned use packages. Ignored for baked-version use packages. This variable defines where in the path to look for the version number - given as an offset from the location of the use package. For example, if the path to the use package is:
-
-`/this/is/the/path/to/the/use/package/v001/wrapper/package.use`
-
-then you would want to set the offset to 2, meaning it would look up the hierarchy by two levels and find `v001`. If this environment variable is not set, defaults to `2`.
-
-##### USE_PKG_PACKAGES
-
-This is a system variable that stores all of the use packages that were found on all of the search paths for the current shell. Do not modify this variable by hand.
-
-##### USE_PKG_HISTORY_FILE
-
-This is a system variable that stores the path to a temporary file that contains the history of use commands in the current shell. It is used to perform a smart 'unuse'. Do not modify this variable nor the linked file by hand.
-
-#
 ### Versioning (auto versions and baked versions)
 
 Each use package typically has a version attached to it (this is not strictly necessary and there may be cases in which you do not wish to include versions, but these cases are less common).
@@ -375,6 +343,38 @@ If you wanted to have a use package for maya 2018.4, you would create another fi
 Along those lines, if you wanted a use package that does not use versions, you would simply create a use package named `maya.use`. It would be presented to the user as `maya`.
 
 Essentially, baked versions are simply version numbers that are baked into the use package names.
+
+#
+### Environmental Variables
+The use system understands the following environmental variables that can modify how the use system itself works. These variables are optional, but if they are used, must be set in the shell where the end user is invoking the use command:
+
+##### USE_PKG_AUTO_VER_SEARCH_PATHS
+
+This is a list of paths where the system will look for use packages that it will auto-version. Defaults to `/opt/apps/`
+
+##### USE_PKG_BAKED_VER_SEARCH_PATHS
+
+This is a list of paths where the system will look for use packages that have versions baked into their names. Defaults to `/opt/use/`
+
+##### USE_PKG_SEARCH_RECURSIVE
+
+A boolean determining whether to search sub-directories of the paths listed above. If False, then only the directories listed above (and none of their sub-directories) will be searched. If this environment variable is not set, defaults to `True`.
+
+##### USE_PKG_AUTO_VERSION_OFFSET
+
+Only applicable to auto-versioned use packages. Ignored for baked-version use packages. This variable defines where in the path to look for the version number - given as an offset from the location of the use package. For example, if the path to the use package is:
+
+`/this/is/the/path/to/the/use/package/v001/wrapper/package.use`
+
+then you would want to set the offset to 2, meaning it would look up the hierarchy by two levels and find `v001`. If this environment variable is not set, defaults to `2`.
+
+##### USE_PKG_PACKAGES
+
+This is a system variable that stores all of the use packages that were found on all of the search paths for the current shell. Do not modify this variable by hand.
+
+##### USE_PKG_HISTORY_FILE
+
+This is a system variable that stores the path to a temporary file that contains the history of use commands in the current shell. It is used to perform a smart 'unuse'. Do not modify this variable nor the linked file by hand.
 
 ---
 
