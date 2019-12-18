@@ -497,13 +497,13 @@ I can also change *which* specific version of the clam tools appear in clarisse 
 
 One use I have for the use system is to change "shows" when working on visual effects. Each show has a unique setup that includes setting which versions of applications to use, which versions of plugins to use for these applications, and even paths to color lookup tables among others.
 
-Setting all of these specific paths and variables and aliases can be done with a very long list of settings in a single .use file. But that would be extremely inefficient. Instead, it is possible to have one use package 'use' other use packages. In this manner, a complex set of behaviors may be created by 'ganging' up multiple, separate, smaller use packages.
+Setting all of these specific paths and variables and aliases *could* be done with a very long list of settings in a single .use file. But that would be extremely inefficient. Instead, it is possible to have one use package 'use' other use packages. In this manner, a complex set of behaviors may be created by 'ganging' up multiple, separate, smaller use packages.
 
 For example, if a show: **MYSHOW** requires a specific version of Nuke, Maya, Blender as well as specific versions of Squirrel and Clam, I would construct individual use packages for each of these. Then my use package for the show would look something like this:
 
 ```bash
 [branch]
-myshow
+show
 
 [env]
 OCIO_CONFIG_PATH=/show/myshow/color
@@ -522,7 +522,7 @@ unuse blender-2.81
 unuse squirrel-1.0
 unuse clam-1.1
 ```
-The branch of this show is "myshow".
+The branch of this show is "show". I use the same branch name for *every* show. This is so that if I 'use' a different show, it will first unuse everything I had used for the previous show. I do not want both shows active in the same shell at the same time.
 
 I set an env variable called OCIO_CONFIG_PATH which controls where to find the Open Color IO luts. This is custom for this specific show, and so any tool that runs in the current shell will find the color luts that are appropriate for this show. If a different show specific use package were used in this or another shell, then any tools would suddenly find that show's color luts.
 
