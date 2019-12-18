@@ -283,7 +283,7 @@ A boolean determining whether to search sub-directories of the paths listed abov
 
 ##### USE_PKG_AUTO_VERSION_OFFSET
 
-Where in the path to look for the version number given as an offset from the location of the use package. For example, if the path to the use package is:
+Only applicable to auto-versioned use packages. Ignored for baked-version use packages. This variable defines where in the path to look for the version number - given as an offset from the location of the use package. For example, if the path to the use package is:
 
 `/this/is/the/path/to/the/use/package/v001/wrapper/package.use`
 
@@ -360,7 +360,7 @@ The second way versions are handled is by simply baking the version number into 
 
 For example, if you want to create a use package for maya 2018.3 via a baked use package, you would create a use file named `maya-2018.3.use`. Note: this file *must* reside in a path that is part of the baked-versions search paths. That is: a) how the use package will be found, and b) how it will be defined as a baked version use package. This use package will then be presented to the user as `maya-2018.3`.
 
-If you wanted to have a use package for maya 2018.4, you would create another file named `maya-2018.4.use`. Again, this file must reside in a baked-versions search path. It would be presented to the user as `maya-2018.3`.
+If you wanted to have a use package for maya 2018.4, you would create another file named `maya-2018.4.use`. Again, this file must reside in a baked-versions search path. It would be presented to the user as `maya-2018.4`.
 
 Along those lines, if you wanted a use package that does not use versions, you would simply create a use package named `maya.use`. It would be presented to the user as `maya`.
 
