@@ -44,7 +44,9 @@ Then add this line to your .bashrc file:
 
 (changing the path to match where you unzipped the files).
 
-Your shells are now ready to start using the 'use' command. 
+Your shells are now ready to start using the 'use' command.
+
+*A note for MacOS users: For some inexplicable reason MacOS does not ship with python 3 (Note: python 2 is end of life as of Jan 1st, 2020). You will have to install python 3 in order for this tool to work. Additionally, you **may** have to modify the first line to read: `/usr/bin/env python3` if your default version of python remains python 2.x (which it probably should for compatability reasons).*
 
 
 ---
@@ -100,7 +102,7 @@ For example, typing `use database-A` in a shell would then have your tool automa
 There is no limit to the number of environmental variables you can set or modify in a single use command. The above example was incredibly simple. It could easily have included setting ten or more variables via a single use command, and that would offer very fine control over the functionality of your tool under different circumstances.
 
 # Additional commands:
-In addition to the previously mentioned "use" command, there are also the following 3 additional commands:
+In addition to the previously mentioned "use" command, there are also the following commands:
 
 `used` - Displays a list of the currently "used" packages in the current shell.
 
