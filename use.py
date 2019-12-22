@@ -51,8 +51,8 @@ LEGAL_PERMISSIONS = [644, 744, 754, 755, 654, 655, 645]
 # and only writable by root.
 # Enforce called script permissions means that any scripts called by a use
 # package must be owned by root and only writable by root.
-ENFORCE_APP_PERMISSIONS = False
-ENFORCE_USE_PKG_PERMISSIONS = False
+ENFORCE_APP_PERMISSIONS = True
+ENFORCE_USE_PKG_PERMISSIONS = True
 ENFORCE_CALLED_SCRIPT_PERMISSIONS = True
 
 # Show errors for use packages or files that do not meet the permissions
