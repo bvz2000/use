@@ -1,5 +1,22 @@
 #!/bin/bash
 
+# MacOS does not have the realpath command installed by default. This is a
+# small workaround as posted by Geoff Nixon at
+# https://stackoverflow.com/questions/3572030/bash-script-absolute-path-with-os-x
+
+userealpath() {
+  OURPWD=$PWD
+  cd "$(dirname "$1")"
+  LINK=$(readlink "$(basename "$1")")
+  while [ "$LINK" ]; do
+    cd "$(dirname "$LINK")"
+    LINK=$(readlink "$(basename "$1")")
+  done
+  REALPATH="$PWD/$(basename "$1")"
+  cd "$OURPWD"
+  echo "$REALPATH"
+}
+
 # This script must be SOURCED (only for some functions)
 if [ "$1" != "desktop" ]; then
 
@@ -10,7 +27,7 @@ if [ "$1" != "desktop" ]; then
 fi
 
 # Get the path to this shell script
-me=`realpath $BASH_SOURCE`
+me=`userealpath $BASH_SOURCE`
 
 # Get the path to the python script
 python_script="`dirname $me`/use.py"
