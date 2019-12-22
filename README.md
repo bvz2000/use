@@ -46,9 +46,11 @@ Then add this line to your .bashrc file:
 
 Your shells are now ready to start using the 'use' command.
 
-*A note for MacOS users: For some inexplicable reason MacOS does not ship with python 3 (Note: python 2 is end of life as of Jan 1st, 2020). You will have to install python 3 in order for this tool to work. Additionally, you **may** have to modify the first line of `use.py` to read: `/usr/bin/env python3` if your default version of python remains python 2.X (which it probably should for compatability reasons).*
+*A note for MacOS users: For some inexplicable reason MacOS does not ship with python 3 (Note: python 2 is end of life as of Jan 1st, 2020). You will have to install python 3 in order for this tool to work.*
+ 
+*Additionally, if your default version of python remains python 2.X (which it probably should for compatability reasons), you **may** have to either use a virtual env with python 3 **OR** modify the first line of `use.py` to read: `/usr/bin/env python3`.*
 
-*If you get an error on a line that looks like `print(message.strip(" "), file=sys.stderr)` then you most likely are running version 2.X of python and will need to make the modification described above.*
+*If you get an error on a line that looks like `print(message.strip(" "), file=sys.stderr)` then you most likely are running version 2.X of python and will need to make the modifications described above.*
 
 
 ---
