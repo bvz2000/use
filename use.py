@@ -1707,9 +1707,11 @@ def setup():
 
     legal_path_found = False
     for path in settings["pkg_av_search_paths"]:
+        path = os.path.expanduser(path)
         if os.path.exists(path) and os.path.isdir(path):
             legal_path_found = True
     for path in settings["pkg_bv_search_paths"]:
+        path = os.path.expanduser(path)
         if os.path.exists(path) and os.path.isdir(path):
             legal_path_found = True
 
