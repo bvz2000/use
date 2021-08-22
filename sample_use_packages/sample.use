@@ -41,26 +41,13 @@
 # NOTE: You may have as many [path-prepend-VAR_NAME] and [path-postpend-VAR_NAME]
 # sections as you need. One for each variable.
 
-# [use-scripts]
-# Use-scripts are a series of outside scripts to source when use is invoked.
-# These scripts must be shell scripts as they will be sourced. For the sake of
-# security, these scripts must be owned by root and may not be writable by
-# anyone outside of root (depending on settings embedded in the use.py code).
-# There may be as many scripts as needed.
+# [use-shell-cmds]
+# Use-shell-cmds is a series of single line bash commands to source when use is
+# invoked. Note that these scripts are SOURCED and not simply run.
 
-# [unuse-scripts]
-# Unuse-scripts are a series of outside scripts to source when unuse is invoked.
-# These scripts must be shell scripts as they will be sourced. They have the
-# same permissions requirements as the use scripts. There may be as many scripts
-# as needed.
-
-# [use-cmds]
-# Use-cmds is a series of single line bash commands to source when use is
-# invoked.
-
-# [unuse-cmds]
-# Unuse-cmds is a series of single line bash commands to source when unuse is
-# invoked.
+# [unuse-shell-cmds]
+# Unuse-shell-cmds is a series of single line bash commands to source when unuse is
+# invoked. Note that these scripts are SOURCED and not simply run.
 
 # The use system also has a few built-in variables that will be expanded
 # automatically. So far this only includes the following:
@@ -87,35 +74,31 @@
 # passed back to the shell.
 
 [branch]
-blender
+sample
 
 [env]
-SOME_BLENDER_RELATED_ENV_VAR=some_value
-SOME_OTHER_VAR=some_other_value
+SOME_SAMPLE_RELATED_ENV_VAR=some_value
+SOME_OTHER_SAMPLE_VAR=some_other_value
 
 [alias]
-blender=$USE_PKG_PATH/blender.sh
-bl=$VERSION_PATH/wrapper/blender.sh
-some_other_alias=ls -al
+sample=$USE_PKG_PATH/sample.sh
+smpl=$VERSION_PATH/wrapper/sample.sh
+some_other_sample_alias=ls -al
 
 [desktop]
-desktop=$USE_PKG_PATH/clarisse.desktop
+desktop=$USE_PKG_PATH/sample.desktop
 
 [path-prepend-IX_SHELF_CONFIG_FILE]
-/some/path/that/I/want/to/prepend/to/the/IX_SHELF_CONFIG_FILE/var
-/This/is/a/second/path/to/prepend/to/this/var
+/some/path/that/I/want/to/prepend/to/the/IX_SHELF_CONFIG_FILE/var/sample
+/This/is/a/second/path/to/prepend/to/this/var/sample
 
 [path-postpend-IX_SHELF_CONFIG_FILE]
-$PRE_VERSION_PATH/$VERSION/app/shelves/shelf.cfg
+$PRE_VERSION_PATH/$VERSION/app/shelves/POSTPEND/sample/shelf.cfg
 
-[use-scripts]
-/some/script/to/run/when/use/is/invoked.sh
+[use-shell-cmds]
+export SAMPLE_SHELL_USE_COMMAND1="SET"
+export SAMPLE_SHELL_USE_COMMAND2="SET"
 
-[unuse-scripts]
-/some/script/to/run/when/unuse/is/invoked.sh
-
-[use-cmds]
-ls -l
-
-[unuse-cmds]
-echo THIS IS A TEST
+[unuse-shell-cmds]
+unset SAMPLE_SHELL_USE_COMMAND1
+unset SAMPLE_SHELL_USE_COMMAND2
