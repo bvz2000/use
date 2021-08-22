@@ -24,11 +24,7 @@ In terms of functionality, this ability to make arbitrary and extensive changes 
 
 These are just a few simple examples. Essentially any changes that you can make manually to a shell to control the environment and change the behavior of the shell itself can be encoded in a use package and invoked with a single command.
 
-If you are familiar with Python programming, a decent analogy would be Python Virtual Environments. The 'use' system allows for similar customizations of your entire environment but in a way that is both simple and comprehensive.
-
-'Use' is designed to work under UNIX-like systems like Linux and MacOS. It *may* work with WSL (Windows Subsystem for Linux) but is untested. It is currently only set up to work under the BASH shell, but it would be relatively trivial to add other shells if there was some demand for this.
-
-This toolset is based on a system that we use where I work.  This is my own interpretation and implementation.
+'Use' is designed to work under UNIX-like systems like Linux and MacOS. It *may* work with WSL (Windows Subsystem for Linux) but is untested. It is currently only set up to work under the BASH shell, but it would be relatively trivial to add other shells if there was some demand for this (it is already set up to be modular in terms of which shell types it interacts with).
 
 ---
 # Installation
@@ -120,7 +116,7 @@ In addition to the previously mentioned "use" command, there are also the follow
 # Under the hood
 ### use_bash.sh and use.py
 
-All of the use commands are handled by a single shell script: use_bash.sh.  This shell script accepts the individual commands (use, unuse, used, setup) as command line arguments.  The shell script also handles tab-completion (the user merely has to type the first few letters of a use package name, hit 'tab', and a list of matching packages will be displayed). The shell script is only responsible for handing the use request off to a python script (use.py) which does the actual processing. This python script then returns a bash command in the form of a string which the shell script then executes.
+All of the use commands are handled by a single shell script: use_bash.sh.  This shell script accepts the individual commands (use, unuse, used, setup) as command line arguments.  The shell script also handles tab-completion (the user merely has to type the first few letters of a use package name, hit 'tab', and a list of matching packages will be displayed). The shell script is only responsible for handing the use request off to a python script (usemain.py) which does the actual processing. This python script then returns a bash command in the form of a string which the shell script then executes.
 
 The actual use_bash.sh command cannot be executed in the normal way. It must actually be sourced in order for the system to work (i.e `source use_bash.sh`).  This is so that the changes being made by this script are actually propagated into the shell in which the use command is being run. This is made easier by the "setup" command which creates three alias' in the current shell that automatically source the use_bash.sh script and include the necessary command line arguments. These alias' are: "use", "unuse", and "used".
 
@@ -163,16 +159,10 @@ desktop=$USE_PKG_PATH/clarisse.desktop
 [path-postpend-IX_SHELF_CONFIG_FILE]
 $PRE_VERSION_PATH/$VERSION/app/shelves/shelf.cfg
 
-[use-scripts]
-/some/script/to/run/when/use/is/invoked.sh
-
-[unuse-scripts]
-/some/script/to/run/when/unuse/is/invoked.sh
-
-[use-cmds]
+[use-shell-cmds]
 use blender_tools-v1.0.1
 
-[unuse-cmds]
+[unuse-shell-cmds]
 unuse blender_tools-v1.0.1
 ```
 
@@ -212,23 +202,16 @@ unuse blender_tools-v1.0.1
    - There is no limit to the number of these [path-prepend] sections you may create, nor any limit to the number of paths you may prepend in any single section.
 - **path-postpend-PATH_VARIABLE**: (Optional). 
   - This works identically to the path-prepend sections, but any paths you include will be appended to the end of the path variables instead of being prepended to the beginning.
-- **use-scripts**: (Optional). 
-  - This is a simple list of scripts to call during the use process. 
-  - These scripts may be any executable file (not simply limited to shell scripts). 
-  - There is no limitation to what these scripts may do, but for security purposes they must be owned by root and only writable by root (this requirement may be modified by changing some constants in the use.py code - see below). 
-  - Scripts will be sourced, not run, so they may affect the status of the current shell.
-- **unuse-scripts**: (Optional). 
-  - Like the use-scripts, this is a list of executables to call when running the unuse command. The same permissions requirements apply. 
-- **use-cmds**: (Optional). 
+- **use-shell-cmds**: (Optional). 
   - This is a simple list of single line shell commands to execute during the use command. 
-  - Be aware that in this section, no security checks are done. There is no good way to offer bullet proof security and allow the free-form running of arbitrary commands. If security is an issue, limit yourself to the use-scripts section above.
-- **unuse-cmds**: (Optional). 
+  - Be aware that in this section, no security checks are done. There is no good way to offer bulletproof security and allow the free-form running of arbitrary commands.
+- **unuse-shell-cmds**: (Optional). 
   - Identical to the use-cmds section, except these commands are executed during the unuse process.
 
 #
 ### Built in Variables
 
-Use packages have access to a number of built in variables.
+Use packages have access to a number of built-in variables.
 
 - USE_PKG_PATH
   - This is the path to the directory that contains the use package itself.
@@ -249,7 +232,7 @@ These variables may be accessed inside a .use package file by preceding them wit
 - $PRE_VERSION_PATH
 - $VERSION_PATH
 
-They may be used in any section of the .use file: [env], [alias], [path-prepend], [path-postpend], [use-scripts], [unuse-scripts], [use-cmds], [unuse-cmds], but not in [branch]. 
+They may be used in any section of the .use file: [env], [alias], [path-prepend], [path-postpend], [use-shell-cmds], [unuse-shell-cmds], but not in [branch]. 
 
 An example using this to set an alias for the application Blender would be:
 
@@ -380,10 +363,6 @@ then you would want to set the offset to 2, meaning it would look up the hierarc
 
 This is a system variable that stores all of the use packages that were found on all of the search paths for the current shell. Do not modify this variable by hand.
 
-##### USE_PKG_HISTORY_FILE
-
-This is a system variable that stores the path to a temporary file that contains the history of use commands in the current shell. It is used to perform a smart 'unuse'. Do not modify this variable nor the linked file by hand.
-
 ---
 
 # How I manage my apps (real world use cases)
@@ -445,13 +424,13 @@ clarisse=$USE_PKG_PATH/clarisse.sh
 $VERSION_PATH/app/shelves/shelf.cfg
 ```
 
-Notice the use of the built in variables like $VERSION_PATH and $USE_PKG_PATH that make this .use file relocatable. In other words, when A new version of Clarisse is released, I merely need to copy this .use file to the new wrapper directory and it will automatically work with the new version.
+Notice the use of the built-in variables like $VERSION_PATH and $USE_PKG_PATH that make this .use file relocatable. In other words, when a new version of Clarisse is released, I merely need to copy this .use file to the new wrapper directory and it will automatically work with the new version.
 
-Clarisse uses an environmental variable named `IX_SHELF_CONFIG_FILE` to indicate where plugin definitions are loaded. I set this path in the .use package via the [path-postpend-IX_SHELF_CONFIG_FILE] section. Now when Clarisse is launched, it will load this particular configuration file. This will become important in the next section where I discuss loading plugins for Clarisse.
+The Clarisse app itself uses an environmental variable named `IX_SHELF_CONFIG_FILE` to indicate where plugin definitions are loaded. I set this path in the .use package via the [path-postpend-IX_SHELF_CONFIG_FILE] section (each unique path variable gets its own section named "[path-postpend-\<VARIABLE NAME\>]" OR "[path-prepend-\<VARIABLE NAME\>]" depending on whether you want the newly added path at the beginning or the end of the path variable list of paths). Now when Clarisse is launched, it will load this particular configuration file. This will become important in the next section where I discuss loading plugins for Clarisse.
 
 ### Managing Different Plugins for Applications.
 
-Clarisse has a python sdk and allows the user to write scripts that are accessible from a toolbar (which they refer to as a shelf).
+As a bit of background, Clarisse has a python sdk and allows the user to write scripts that are accessible from a toolbar (which they refer to as a shelf). Clarisse knows where to find these shelves based on the values set in an environmental variable called "IX_SHELF_CONFIG_FILE" that contains paths to the various config files defining these shelves.
 
 One tool I have written is called CLAM (Which stands for **CL**arisse **A**sset **M**anagement). This is a set of python scripts that interface with another tool I have written called SQUIRREL (an asset management back end).
 
@@ -472,9 +451,9 @@ $VERSION_PATH/bin
 
 The branch is defined as "squirrel".
 
-I modify my PYTHONPATH to add the modules for the squirrel application (to allow me to import these in any other tools that want to make use of squirrel).
+In the above section, you can see that I  modify my **PYTHONPATH** to add the modules for the squirrel application (to allow me to import these in any other tools that want to make use of squirrel).
 
-I modify my PATH variable to add the bin directory of the squirrel application. As a consequence, I can then call various command line applications associated with squirrel without having to supply a full path.
+I also modify my **PATH** variable to add the bin directory of the squirrel application. As a consequence, I can then call various command line applications associated with squirrel without having to supply a full path.
 
 After squirrel, I create a another use package for CLAM. Its contents are:
 
@@ -491,13 +470,13 @@ $VERSION_PATH/shelves/shelf.cfg
 
 The branch is defined as "clam".
 
-I modify my PYTHONPATH to add the modules for clam (again, to allow for other tools to import these libraries.)
+Once again I modify my **PYTHONPATH** to add the modules for clam (again, to allow for other tools to import these libraries.)
 
-I also modify my IX_SHELF_CONFIG_FILE path to add a path to the specific shelf configuration file for clam. Recall that in the previous section I set a default path for this path variable. That allowed me to add the default toolbars to Clarisse. By adding to this same path in this use package, I am adding a second toolbar that contains the CLAM specific tools.
+I also modify my **IX_SHELF_CONFIG_FILE** path (described above) to add a path to the specific shelf configuration file for clam. Recall that when I set up my Clarisse use package, I set a default path for this path variable which loaded the default Clarisse shelves. Now, by adding to this same path in **THIS** use package, I am adding a second toolbar that contains the CLAM specific tools.
 
-In this way I can add any set of additional tools to my copy of Clarisse, simply by 'using' those tools.
+In this way I can add any set of additional tools to my copy of Clarisse, simply by 'using' those tools. I can make as many use packages as I have additional tools and plugins that I want to add to Clarisse. Simply by 'using' these tools prior to launching Clarisse will load them in that session. If I do not want a shelf loaded, I can forgo 'using' that tool, and it will no longer be loaded into Clarisse. This is much faster and more flexible than trying to hand code which toolsets (and which versions of these toolsets) are loaded each time I want to run Clarisse.
 
-I can also change *which* specific version of the clam tools appear in clarisse simply by "using" a different version of clam.
+And this extends to versioning. I can change *which* specific version of a tool (in this case which version of the clam tools) that appears in clarisse simply by 'using' a different version of clam.
 
 ### Other use cases.
 
@@ -536,7 +515,7 @@ I use the [use-cmds] section to load additional use packages. So by running the 
 
 I can also manually unuse any of these used packages one by one if needed.
 
-A list of all currently used packages, whether manually used in a shell, or auto-used from another use package can be displayed by typing: `use`.
+A list of all currently used packages, whether manually used in a shell, or auto-used from another use package can be displayed by typing: `used`.
 
 ### Auto-using use packages.
 
@@ -549,13 +528,17 @@ In this case don't even have to type the use commands by hand. They will be avai
 ---
 # A note about security:
 
-Some very minor steps have been taken to provide a modest amount of security. The use.py application itself will refuse to run if it is not owned by root and not only writable by root (to prevent tampering with the source code). It will also only run executables (in the use-scripts and unuse-scripts sections) if they are owned by root and only writable by root. This prevents someone from surreptitiously changing the contents of a script being called by the use system and tricking the user into running malicious code. Similarly, use package files will only be processed if they have the same limitations (owned by root and only writable by root) to prevent someone from injecting another command into the use system without the end user being aware of it. 
+Some very minor steps have been taken to provide a modest amount of security. The use.py application itself will refuse to run if it is not owned by root and not only writable by root (to prevent tampering with the source code). Use package files themselves will only be processed if they have the same limitations (owned by root and only writable by root) to prevent someone from injecting another command into the use system without the end user being aware of it. 
 
-That said, Any commands listed in the use-cmds and unuse-cmds section are not validated in the same way. Normally these sections should be used to run fairly innocent commands (like setting a python virtual environment). But note that even these seemingly innocuous commands could be hijacked and provide an avenue for malicious behavior. So calibrate your risk aversion accordingly.
+Any commands listed in the use-shell-cmds and unuse-shell-cmds section, however, are not validated in the same way. Normally these sections should be used to run fairly innocent commands (like setting a python virtual environment). But note that even these seemingly innocuous commands could be hijacked and provide an avenue for malicious behavior. So calibrate your risk aversion accordingly.
 
-These security precautions are generally used to prevent casual tampering with the use system, and are probably best to leave in place. They are NOT exhaustive security measures meant to prevent any and all exploits of the use system. But to be frank, if someone has gained access to your system and modified it such that the use system is now a vector for malware, you have much bigger issues to deal with. There is little that the use system can do that someone who already has access to your system could not do manually.
+These security precautions are generally used to prevent casual tampering with the use system, and are probably best to leave in place. They are NOT exhaustive security measures meant to prevent any and all exploits of the use system. 
 
-Along these lines, if these security settings are too restrictive, the source code contains several constants at the top of the code that enables and disables these security features. You may set them to True or False to control how permission validations are performed.
+It is not advisable to ever run a use command as root (or via sudo). Use commands, by default, have the ability to run arbitrary shell commands. If someone managed to hijack the use system, and you ran a use command as root, you are effectively running arbitrary commands as root (of course this applies to any script on your system that you run as root...). If this ability to run arbitrary commands seems too much of a security hole, there is a setting within the code named "ALLOW_ARBITRARY_COMMANDS" that can be set to **False** which will prevent the system from running any commands. If you set this flag to false, the use system will only be able to set environmental variables and aliases. But even this mechanism could be an avenue for a security threat.
+
+That said, let's be frank for a moment. If someone has gained access to your system and modified it such that the use system is now a vector for malware, you have much bigger issues to deal with. There is little that the use system can do that someone who already has access to your system could not do manually. And if they can modify the use system such that it threatens your system, they will certainly be modifying other tools that have an even bigger impact.
+
+Alternatively, if these security settings are too restrictive, the source code contains several constants at the top of the code (in addition to ALLOW_ARBITRARY_COMMANDS) that enables and disables these security features. You may set them to True or False to control how permission validations are performed.
 
 
 ---
@@ -569,7 +552,7 @@ Along these lines, if these security settings are too restrictive, the source co
 
 - What about using docker?
 
-  - Docker is a very powerful mechanism for virtualizing portions of your system. But it can be overkill and isn't really meant to be used for desktop applications. The Use system is fairly simple to set up and manage. It is intended to be easy and quick, without a lot of overhead. It merely manages different versions of applications and libraries on a simple desktop system.
+  - Docker is a very powerful mechanism for virtualizing portions of your system. But it can be overkill and isn't really meant to be used for desktop applications. The Use system is fairly simple to set up and manage. It is intended to be easy and quick, without a lot of overhead. It merely manages different versions of applications and libraries on a simple desktop system. It only modifies your shell environment which is all that many applications or workflows really need.
 
 - What are the system requirements?
 
@@ -578,3 +561,7 @@ Along these lines, if these security settings are too restrictive, the source co
 - What about tcsh? zsh? Any other shells?
 
   - The usage of the bash shell is the only one currently supported. But this connection to the calling shell is completely modular. If there were a need for additional shells, it would be relatively trivial to add that in the future.
+
+- Has anyone actually even asked ANY questions, much less "Frequently Asked Questions"?
+  
+  - Ha! ... No. Sigh. But hope springs eternal, right?
