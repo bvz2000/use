@@ -30,7 +30,16 @@ fi
 me=`userealpath $BASH_SOURCE`
 
 # Get the path to the python script
-python_script="`dirname $me`/use.py"
+python_script="`dirname $me`/usemain.py"
+
+
+# If this is a refresh command (-refresh or --refresh is in the args) do that and quit.
+#if [ "$2" == "-refresh" ]; then
+#    echo "Well fuck"
+#    echo `$python_script bash refresh`
+#    exit 0
+#fi
+
 
 
 
@@ -68,11 +77,24 @@ if [ "$1" == "setup" ]; then
     alias unuse="source $me unuse"
     alias used="source $me used"
     alias useRefresh="source $me refresh"
-    alias useconfig="$me config"
-    alias useSymlinkLatest="source $me update"
-    alias useUpdateDesktops="$me desktop"
+    # alias useconfig="$me config"
+    # alias useSymlinkLatest="source $me update"
+    # alias useUpdateDesktops="$me desktop"
 
     return 0
+
+fi
+
+
+# ==============================================================================
+# refresh
+# ==============================================================================
+
+# If this is a refres, then just build a new list of all of the use packages.
+if [ "$1" == "refresh" ]; then
+
+    # Run the python setup
+    eval `$python_script bash refresh`
 
 fi
 
@@ -82,8 +104,15 @@ fi
 
 if [ "$1" == "use" ]; then
 
-    unuse_pkg=`$python_script bash unuse_package_from_use_package $2`
-    eval `alias | $python_script bash unuse $unuse_pkg`
+    # Note: we pipe the alias command into the script because that is how we inform
+    # the script of the current alias values.
+
+    # We have to start by un-using the branch
+    #unuse_pkg=`$python_script bash get_branch_from_use_pkg_name $2`
+    #eval `alias | $python_script bash unuse $unuse_pkg`
+    eval `alias | $python_script bash unuse $2`
+
+    # Then use the new use package
     eval `alias | $python_script bash use $2`
 
 fi

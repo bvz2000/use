@@ -514,14 +514,14 @@ show
 [env]
 OCIO_CONFIG_PATH=/show/myshow/color
 
-[use_cmds]
+[use_shell_cmds]
 use maya-2018.4
 use nuke-v11
 use blender-2.81
 use squirrel-1.0
 use clam-1.1
 
-[unuse_cmds]
+[unuse_shell_cmds]
 unuse maya-2018.4
 unuse nuke-v11
 unuse blender-2.81
