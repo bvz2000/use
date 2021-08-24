@@ -49,7 +49,7 @@ def format_path_var(path_var_name,
 
     output = ":".join(path_var_values)
 
-    return "export " + path_var_name + "=" + output
+    return "export " + path_var_name + "='" + output + "'"
 
 
 # ----------------------------------------------------------------------------------------------------------------------
