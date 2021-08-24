@@ -10,7 +10,7 @@ import display
 import permissions
 import setup
 
-DEBUG = True
+DEBUG = False
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -570,8 +570,9 @@ def use(shell_obj,
         # Add this command to the shell commands.
         shell_cmds.append(shell_obj.format_path_var(path_var_name, prepends))
 
-    for use_cmd in use_shell_cmds:
-        shell_cmds.append(use_cmd)
+    if permissions.validate_arbitrary_shell_permissions():
+        for use_cmd in use_shell_cmds:
+            shell_cmds.append(use_cmd)
 
     # Convert the list of existing aliases to a dictionary
     existing_aliases = format_existing_aliases_into_dict(raw_aliases)

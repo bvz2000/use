@@ -2,7 +2,6 @@
 
 import os
 
-import display
 import envmapping
 
 

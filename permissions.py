@@ -3,35 +3,34 @@ import sys
 
 import display
 
-# A list of legal permissions for use packages (those that do not have one of
-# these permissions will not be allowed to run for security purposes)
+# A list of legal permissions for use packages (those that do not have one of these permissions will not be allowed to
+# run for security purposes)
 LEGAL_PERMISSIONS = [644, 744, 754, 755, 654, 655, 645]
 
-# Whether to enforce these permissions. Should almost always be set to False
-# when doing development. Whether to set these to True for actual production is
-# up to your sense of comfort. The idea behind setting restrictive permissions
-# is that this system will call arbitrary commands that may be invisible to the
-# end user if they are not actively examining the .use files and checking the
-# provenance of any scripts that these arbitrary commands have.
+# Whether to enforce these permissions. Should almost always be set to False when doing development. Whether to set
+# these to True for actual production is up to your sense of comfort. The idea behind setting restrictive permissions
+# is that this system may call arbitrary commands that may be invisible to the end user if they are not actively
+# examining the .use files and checking the provenance of any scripts that these arbitrary commands run.
 #
-# That said, if someone has compromised your system and installed user-level
-# malicious code, you probably have bigger problems than having this system
-# execute this code. Still, the best practice would be to enable all of the
-# permission checking.
+# That said, if someone has compromised your system and installed user-level malicious code, you probably have bigger
+# problems than having this system execute this code. Still, the best practice would be to set all of the following
+# permission checking flags to True (Note: ALLOW_ARBITRARY_COMMANDS, when set to True, actually is less secure, but it
+# is also very useful, therefore it is suggested to leave that enabled unless you really know you do not want to use
+# this feature).
 #
 # There are three options:
-# Enforce app permissions means this usemain.py file must be owned by root and only
-# writable by root.
-# Enforce use pkg permissions means that any use packages must be owned by root
-# and only writable by root.
-# Enforce called script permissions means that any scripts called by a use
-# package must be owned by root and only writable by root.
-ENFORCE_APP_PERMISSIONS = False
-ENFORCE_USE_PKG_PERMISSIONS = False
-ENFORCE_CALLED_SCRIPT_PERMISSIONS = True
 
-# Show errors for use packages or files that do not meet the permissions
-# requirements, or simply ignore them silently.
+# Enforce app permissions means this usemain.py file must be owned by root and only writable by root.
+ENFORCE_APP_PERMISSIONS = True
+
+# Enforce use pkg permissions means that any use packages must be owned by root and only writable by root.
+ENFORCE_USE_PKG_PERMISSIONS = True
+
+# Allow arbitrary commands, if True, will allow the user to stack any shell commands into a use package and they will
+# be run on use and unuse. If False, then this functionality will be disabled.
+ALLOW_ARBITRARY_COMMANDS = True
+
+# Show errors for use packages or files that do not meet the permissions requirements, or simply ignore them silently.
 DISPLAY_PERMISSIONS_VIOLATIONS = True
 
 
@@ -105,5 +104,20 @@ def validate_app_permissions():
     """
 
     if ENFORCE_APP_PERMISSIONS:
-        if not validate_permissions(os.path.abspath(__file__), LEGAL_PERMISSIONS):
-            handle_permission_violation(os.path.abspath(__file__))
+        app_path = os.path.split(os.path.abspath(__file__))[0]
+
+        for filename in os.listdir(app_path):
+            if not os.path.isdir(filename):
+                if not validate_permissions(os.path.abspath(__file__), LEGAL_PERMISSIONS):
+                    handle_permission_violation(os.path.abspath(__file__))
+
+
+# ----------------------------------------------------------------------------------------------------------------------
+def validate_arbitrary_shell_permissions():
+    """
+    Returns whether or not arbitrary shell commands may be run.
+
+    :return: Nothing.
+    """
+
+    return ALLOW_ARBITRARY_COMMANDS

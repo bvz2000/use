@@ -103,4 +103,3 @@ def export_shell_command(cmds):
         output += cmd + ";"
 
     print(output)
-

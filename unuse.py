@@ -4,8 +4,9 @@ import ast
 import os
 
 import display
+import permissions
 
-DEBUG = True
+DEBUG = False
 
 
 # ----------------------------------------------------------------------------------------------------------------------
@@ -468,7 +469,8 @@ def unuse(shell_obj,
 
     # 4) run the raw unuse commands from the use package. These are just arbitrary shell commands that the user has
     #    added to the use package. There is no validation done. These are simply just run.
-    run_unuse_cmds(shell_obj, branch_name)
+    if permissions.validate_arbitrary_shell_permissions():
+        run_unuse_cmds(shell_obj, branch_name)
 
     # 5) remove the env vars specific to this branch
     cleanup_cmds = list()
