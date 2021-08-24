@@ -40,6 +40,15 @@ Then add this line to your .bashrc file:
 
 (changing the path to match where you unzipped the files).
 
+By default, use will not work if the permissions of your files are not properly set (this can be changed by editing some constants in the source code). So to make sure Use works, you have to set the permissions on all the .py files such that they are owned by root, and only writable by root. This can be accomplished by CD'ing to the directory where you installed the downloaded code and executing the following commands (you may need to be a super-user in order for them to work):
+
+```
+chown root *.py
+chown root *.sh
+chmod go-w *.py
+chmod go-w *.sh
+```
+
 Your shells are now ready to start using the 'use' command.
 
 *A note for MacOS users: For some inexplicable reason MacOS does not ship with python 3 (Note: python 2 is end of life as of Jan 1st, 2020). You will have to install python 3 in order for this tool to work.*
