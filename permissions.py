@@ -21,10 +21,10 @@ LEGAL_PERMISSIONS = [644, 744, 754, 755, 654, 655, 645]
 # There are three options:
 
 # Enforce app permissions means this usemain.py file must be owned by root and only writable by root.
-ENFORCE_APP_PERMISSIONS = True
+ENFORCE_APP_PERMISSIONS = False
 
 # Enforce use pkg permissions means that any use packages must be owned by root and only writable by root.
-ENFORCE_USE_PKG_PERMISSIONS = True
+ENFORCE_USE_PKG_PERMISSIONS = False
 
 # Allow arbitrary commands, if True, will allow the user to stack any shell commands into a use package and they will
 # be run on use and unuse. If False, then this functionality will be disabled.

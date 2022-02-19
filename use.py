@@ -571,8 +571,8 @@ def use(shell_obj,
         shell_cmds.append(shell_obj.format_path_var(path_var_name, prepends))
 
     if permissions.validate_arbitrary_shell_permissions():
-        for use_cmd in use_shell_cmds:
-            shell_cmds.append(use_cmd)
+        for use_shell_cmd in use_shell_cmds:
+            shell_cmds.append(use_shell_cmd)
 
     # Convert the list of existing aliases to a dictionary
     existing_aliases = format_existing_aliases_into_dict(raw_aliases)
